@@ -1,0 +1,18 @@
+version: '3.7'
+services:
+  whatsgrambot:
+    build:
+      context: .
+      args:
+        PORT: ${PORT}
+    ports:
+      - "${PORT}:${PORT}"
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Jerusalem
+    platform: linux/amd64
+    container_name: whatsgrambot
+    volumes:
+      - ./:/whatsgrambot
+    command: ["python", "main.py"]

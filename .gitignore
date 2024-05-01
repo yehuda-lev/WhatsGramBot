@@ -1,0 +1,8 @@
+venv
+.idea
+*pycache*
+*.session*
+*.env
+*.log
+*.txt
+*.sqlite
