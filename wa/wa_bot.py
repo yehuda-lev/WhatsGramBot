@@ -1,18 +1,100 @@
+import io
 import logging
-from pywa import WhatsApp, types
+import typing
+
+from pywa import types as wa_types, WhatsApp
+from pyrogram import types as tg_types
 
 from data import clients, config
+from db import repositoy
 
 
 _logger = logging.getLogger(__name__)
 
 tg_bot = clients.tg_bot
 settings = config.get_settings()
-send_to = settings.tg_id_test
+send_to = settings.tg_group_topic_id
 
 
-def echo(_: WhatsApp, msg: types.Message):
-    tg_bot.send_message(
-        chat_id=send_to,
-        text=msg.text,
+def echo(_: WhatsApp, msg: wa_types.Message):
+    wa_id = msg.sender
+    user = repositoy.get_user_by_wa_id(wa_id=wa_id)
+    topic_id = user.topic.topic_id
+    send = None
+
+    if msg.has_media:
+        download = io.BytesIO(msg.download_media(in_memory=True))
+        download.name = f"{msg.type}{msg.media.extension}"
+        media_kwargs = dict(
+            chat_id=send_to,
+            caption=msg.text,
+            reply_parameters=tg_types.ReplyParameters(message_id=topic_id),
+        )
+        match msg.type:
+            case wa_types.MessageType.IMAGE:
+                send = tg_bot.send_photo(
+                    **media_kwargs,
+                    photo=download,
+                )
+            case wa_types.MessageType.VIDEO:
+                send = tg_bot.send_video(
+                    **media_kwargs,
+                    video=download,
+                )
+            case wa_types.MessageType.DOCUMENT:
+                send = tg_bot.send_document(
+                    **media_kwargs,
+                    document=download,
+                )
+            case wa_types.MessageType.AUDIO:
+                if msg.media.voice:
+                    send = tg_bot.send_voice(
+                        **media_kwargs,
+                        voice=download,
+                    )
+                else:
+                    send = tg_bot.send_audio(
+                        **media_kwargs,
+                        audio=download,
+                    )
+            case wa_types.MessageType.STICKER:
+                send = tg_bot.send_sticker(
+                    **media_kwargs,
+                    sticker=download,
+                )
+            case _:
+                _logger.warning(f"Unsupported media type: {msg.type}")
+                return
+    else:
+        kwargs = dict(
+            chat_id=send_to,
+            reply_parameters=tg_types.ReplyParameters(message_id=topic_id),
+        )
+        match msg.type:
+            case wa_types.MessageType.TEXT:
+                send = tg_bot.send_message(
+                    **kwargs,
+                    text=msg.text,
+                )
+            case wa_types.MessageType.CONTACTS:
+                for contact in msg.contacts:
+                    send = tg_bot.send_contact(
+                        **kwargs,
+                        first_name=contact.name.first_name,
+                        last_name=contact.name.last_name,
+                        phone_number=typing.cast(tuple, contact.phones)[0].phone,
+                        vcard=contact.as_vcard(),
+                    )
+            case wa_types.MessageType.LOCATION:
+                send = tg_bot.send_location(
+                    **kwargs,
+                    latitude=msg.location.latitude,
+                    longitude=msg.location.longitude,
+                )
+            case _:
+                _logger.warning(f"Unsupported message type: {msg.type}")
+                return
+
+    repositoy.create_message(
+        wa_id=wa_id, topic_id=topic_id, wa_msg_id=msg.id, topic_msg_id=send.id
     )

@@ -55,6 +55,32 @@ def get_topic_by_topic_id(*, topic_id: int) -> Topic:
         return session.query(Topic).filter(Topic.topic_id == topic_id).one()
 
 
+def update_user(*, wa_id: str, **kwargs):
+    """
+    Update user
+    :param wa_id: the number of the user
+    :param kwargs: the fields to update
+    :return:
+    """
+    _logger.debug(f"update user wa_id:{wa_id}, kwargs:{kwargs}")
+    with get_session() as session:
+        session.query(WaUser).filter(WaUser.wa_id == wa_id).update(kwargs)
+        session.commit()
+
+
+def update_topic(*, topic_id: int, **kwargs):
+    """
+    Update topic
+    :param topic_id: the id of the topic
+    :param kwargs: the fields to update
+    :return:
+    """
+    _logger.debug(f"update topic topic_id:{topic_id}, kwargs:{kwargs}")
+    with get_session() as session:
+        session.query(Topic).filter(Topic.topic_id == topic_id).update(kwargs)
+        session.commit()
+
+
 def create_message(*, wa_id: str, topic_id: int, wa_msg_id: str, topic_msg_id: int):
     """
     Create message
@@ -91,5 +117,9 @@ def get_message(*, topic_msg_id: int | None, wa_msg_id: str | None) -> Message:
     """
     with get_session() as session:
         if topic_msg_id:
-            return session.query(Message).filter(Message.topic_msg_id == topic_msg_id).one()
+            return (
+                session.query(Message)
+                .filter(Message.topic_msg_id == topic_msg_id)
+                .one()
+            )
         return session.query(Message).filter(Message.wa_msg_id == wa_msg_id).one()
