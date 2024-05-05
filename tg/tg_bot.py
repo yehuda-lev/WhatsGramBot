@@ -26,6 +26,14 @@ def echo(_: Client, msg: tg_types.Message):
     if topic.user.banned:
         return
 
+    reply_msg = None
+    if msg.message_thread_id:
+        reply_to = msg.reply_to_message_id
+        try:
+            reply_msg = repositoy.get_message(topic_msg_id=reply_to, wa_msg_id=None)
+        except NoResultFound:
+            pass
+
     wa_id = topic.user.wa_id
     sent = None
 
@@ -52,6 +60,7 @@ def echo(_: Client, msg: tg_types.Message):
         media_kwargs = dict(
             to=wa_id,
             caption=msg.caption,
+            reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
         )
 
         match msg.media:
@@ -138,6 +147,7 @@ def echo(_: Client, msg: tg_types.Message):
             sent = wa_bot.send_message(
                 to=wa_id,
                 text=msg.text,
+                reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
             )
         elif msg.location or msg.venue:
             sent = wa_bot.send_location(
@@ -155,6 +165,7 @@ def echo(_: Client, msg: tg_types.Message):
             _logger.exception(msg.contact.phone_number)
             sent = wa_bot.send_contact(
                 to=wa_id,
+                reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
                 contact=wa_types.Contact(
                     name=wa_types.Contact.Name(
                         formatted_name=msg.contact.first_name

@@ -4,6 +4,7 @@ import typing
 
 from pywa import types as wa_types, WhatsApp
 from pyrogram import types as tg_types
+from sqlalchemy.exc import NoResultFound
 
 from data import clients, config
 from db import repositoy
@@ -21,6 +22,13 @@ def echo(_: WhatsApp, msg: wa_types.Message):
     user = repositoy.get_user_by_wa_id(wa_id=wa_id)
     topic_id = user.topic.topic_id
     send = None
+    reply_msg = None
+    if msg.is_reply:
+        try:
+            reply_to = msg.reply_to_message.message_id
+            reply_msg = repositoy.get_message(wa_msg_id=reply_to, topic_msg_id=None)
+        except NoResultFound:
+            pass
 
     if msg.has_media:
         download = io.BytesIO(msg.download_media(in_memory=True))
@@ -28,7 +36,9 @@ def echo(_: WhatsApp, msg: wa_types.Message):
         media_kwargs = dict(
             chat_id=send_to,
             caption=msg.text,
-            reply_parameters=tg_types.ReplyParameters(message_id=topic_id),
+            reply_parameters=tg_types.ReplyParameters(
+                message_id=reply_msg.topic_msg_id if reply_msg else topic_id
+            ),
         )
         match msg.type:
             case wa_types.MessageType.IMAGE:
@@ -68,7 +78,9 @@ def echo(_: WhatsApp, msg: wa_types.Message):
     else:
         kwargs = dict(
             chat_id=send_to,
-            reply_parameters=tg_types.ReplyParameters(message_id=topic_id),
+            reply_parameters=tg_types.ReplyParameters(
+                message_id=reply_msg.topic_msg_id if reply_msg else topic_id
+            ),
         )
         match msg.type:
             case wa_types.MessageType.TEXT:
