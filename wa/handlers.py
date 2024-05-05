@@ -1,11 +1,11 @@
 import logging
-from pywa import types as wa_types, handlers, WhatsApp
+from pywa import types as wa_types, handlers, WhatsApp, filters, errors
 from pyrogram import types as tg_types
 from sqlalchemy.exc import NoResultFound
 
 from wa import wa_bot
 from db import repositoy
-from data import clients, config
+from data import clients, config, modules
 
 _logger = logging.getLogger(__name__)
 settings = config.get_settings()
@@ -13,7 +13,7 @@ settings = config.get_settings()
 tg_bot = clients.tg_bot
 
 
-def create_user(_: WhatsApp, msg: wa_types.Message):
+def create_user(_: WhatsApp, msg: wa_types.Message) -> bool:
     wa_id = msg.sender
     name = msg.from_user.name
     try:
@@ -54,9 +54,26 @@ def create_user(_: WhatsApp, msg: wa_types.Message):
     return True
 
 
+def on_failed_status(_: WhatsApp, status: wa_types.MessageStatus[modules.Tracker]):
+    tg_bot.send_message(
+        chat_id=status.tracker.chat_id,
+        text=f"__{status.error.details}__",
+        reply_parameters=tg_types.ReplyParameters(message_id=status.tracker.msg_id),
+    )
+    if isinstance(status.error, errors.ReEngagementMessage):  # 24 hours passed
+        repositoy.update_user(wa_id=status.sender, active=False)
+    else:
+        _logger.error(status.error)
+
+
 HANDLERS = [
     handlers.MessageHandler(
         wa_bot.echo,
         create_user,
-    )
+    ),
+    handlers.MessageStatusHandler(
+        on_failed_status,
+        filters.message_status.failed,
+        factory=modules.Tracker,
+    ),
 ]

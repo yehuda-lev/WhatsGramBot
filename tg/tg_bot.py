@@ -5,7 +5,7 @@ from pyrogram import types as tg_types, Client, enums
 from pywa import types as wa_types
 from sqlalchemy.exc import NoResultFound
 
-from data import clients, config
+from data import clients, config, modules
 from db import repositoy
 
 _logger = logging.getLogger(__name__)
@@ -37,6 +37,8 @@ def echo(_: Client, msg: tg_types.Message):
     wa_id = topic.user.wa_id
     sent = None
 
+    kwargs = dict(to=wa_id, tracker=modules.Tracker(chat_id=msg.chat.id, msg_id=msg.id))
+
     if msg.media in (
         enums.MessageMediaType.PHOTO,
         enums.MessageMediaType.VIDEO,
@@ -58,9 +60,9 @@ def echo(_: Client, msg: tg_types.Message):
 
         download = msg.download(in_memory=True)
         media_kwargs = dict(
-            to=wa_id,
-            caption=msg.caption,
+            **kwargs,
             reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
+            caption=msg.caption,
         )
 
         match msg.media:
@@ -118,13 +120,13 @@ def echo(_: Client, msg: tg_types.Message):
             # with no caption
             case enums.MessageMediaType.AUDIO:
                 sent = wa_bot.send_audio(
-                    to=wa_id,
+                    **kwargs,
                     audio=download,
                     mime_type=media.mime_type or "audio/mpeg",
                 )
             case enums.MessageMediaType.VOICE:
                 sent = wa_bot.send_audio(
-                    to=wa_id,
+                    **kwargs,
                     audio=download,
                     mime_type=media.mime_type or "audio/ogg",
                 )
@@ -134,7 +136,7 @@ def echo(_: Client, msg: tg_types.Message):
                     return
 
                 sent = wa_bot.send_sticker(
-                    to=wa_id,
+                    **kwargs,
                     sticker=download,
                     mime_type=media.mime_type or "image/webp",
                 )
@@ -145,13 +147,13 @@ def echo(_: Client, msg: tg_types.Message):
     else:
         if msg.text:
             sent = wa_bot.send_message(
-                to=wa_id,
+                **kwargs,
                 text=msg.text,
                 reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
             )
         elif msg.location or msg.venue:
             sent = wa_bot.send_location(
-                to=wa_id,
+                **kwargs,
                 latitude=msg.location.latitude
                 if msg.location
                 else msg.venue.location.latitude,
@@ -164,7 +166,7 @@ def echo(_: Client, msg: tg_types.Message):
         elif msg.contact:
             _logger.exception(msg.contact.phone_number)
             sent = wa_bot.send_contact(
-                to=wa_id,
+                **kwargs,
                 reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
                 contact=wa_types.Contact(
                     name=wa_types.Contact.Name(
