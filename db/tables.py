@@ -80,9 +80,9 @@ class Message(BaseTable):
     created_at: Mapped[datetime.datetime]
 
     topic_id: Mapped[int] = mapped_column(ForeignKey("topic.id"))
-    topic: Mapped[Topic] = relationship(back_populates="messages")
+    topic: Mapped[Topic] = relationship(back_populates="messages", lazy="joined")
     user_id: Mapped[int] = mapped_column(ForeignKey("wa_user.id"))
-    user: Mapped[WaUser] = relationship(back_populates="messages")
+    user: Mapped[WaUser] = relationship(back_populates="messages", lazy="joined")
 
 
 BaseTable.metadata.create_all(engine)
