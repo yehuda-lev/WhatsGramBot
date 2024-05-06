@@ -13,7 +13,7 @@ settings = config.get_settings()
 tg_bot = clients.tg_bot
 
 
-def create_user(_: WhatsApp, msg: wa_types.Message) -> bool:
+async def create_user(_: WhatsApp, msg: wa_types.Message) -> bool:
     wa_id = msg.sender
     name = msg.from_user.name
     try:
@@ -24,7 +24,7 @@ def create_user(_: WhatsApp, msg: wa_types.Message) -> bool:
             return False
     except NoResultFound:  # user not exists
         # create user and topic
-        topic = tg_bot.create_forum_topic(
+        topic = await tg_bot.create_forum_topic(
             chat_id=settings.tg_group_topic_id,
             name=f"{name} | {wa_id}",
         )
@@ -35,7 +35,7 @@ def create_user(_: WhatsApp, msg: wa_types.Message) -> bool:
             topic_id=topic_id,
         )
 
-        send = tg_bot.send_message(
+        sent = await tg_bot.send_message(
             chat_id=settings.tg_group_topic_id,
             text=f"User {name} | {wa_id} created topic {topic.id}",
             reply_parameters=tg_types.ReplyParameters(message_id=topic.id),
@@ -49,13 +49,15 @@ def create_user(_: WhatsApp, msg: wa_types.Message) -> bool:
                 ],
             ),
         )
-        send.pin(disable_notification=True)
+        await sent.pin(disable_notification=True)
 
     return True
 
 
-def on_failed_status(_: WhatsApp, status: wa_types.MessageStatus[modules.Tracker]):
-    tg_bot.send_message(
+async def on_failed_status(
+    _: WhatsApp, status: wa_types.MessageStatus[modules.Tracker]
+):
+    await tg_bot.send_message(
         chat_id=status.tracker.chat_id,
         text=f"__{status.error.details}__",
         reply_parameters=tg_types.ReplyParameters(message_id=status.tracker.msg_id),
@@ -68,7 +70,7 @@ def on_failed_status(_: WhatsApp, status: wa_types.MessageStatus[modules.Tracker
 
 HANDLERS = [
     handlers.MessageHandler(
-        wa_bot.on_message,
+        wa_bot.get_message,
         create_user,
     ),
     handlers.MessageStatusHandler(

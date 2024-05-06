@@ -1,8 +1,6 @@
 import logging
 import datetime
 
-from sqlalchemy import exists, func
-
 from db.tables import get_session, WaUser, Topic, Message
 
 

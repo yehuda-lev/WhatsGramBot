@@ -1,7 +1,6 @@
 import io
 import logging
 import typing
-
 from pywa import types as wa_types, WhatsApp
 from pyrogram import types as tg_types, errors
 from sqlalchemy.exc import NoResultFound
@@ -16,11 +15,11 @@ settings = config.get_settings()
 send_to = settings.tg_group_topic_id
 
 
-def on_message(_: WhatsApp, msg: wa_types.Message):
+async def get_message(_: WhatsApp, msg: wa_types.Message):
     wa_id = msg.sender
     user = repositoy.get_user_by_wa_id(wa_id=wa_id)
     topic_id = user.topic.topic_id
-    send = None
+    sent = None
     reply_msg = None
     if msg.is_reply:
         try:
@@ -42,33 +41,33 @@ def on_message(_: WhatsApp, msg: wa_types.Message):
             )
             match msg.type:
                 case wa_types.MessageType.IMAGE:
-                    send = tg_bot.send_photo(
+                    sent = await tg_bot.send_photo(
                         **media_kwargs,
                         photo=download,
                     )
                 case wa_types.MessageType.VIDEO:
-                    send = tg_bot.send_video(
+                    sent = await tg_bot.send_video(
                         **media_kwargs,
                         video=download,
                     )
                 case wa_types.MessageType.DOCUMENT:
-                    send = tg_bot.send_document(
+                    sent = await tg_bot.send_document(
                         **media_kwargs,
                         document=download,
                     )
                 case wa_types.MessageType.AUDIO:
                     if msg.media.voice:
-                        send = tg_bot.send_voice(
+                        sent = await tg_bot.send_voice(
                             **media_kwargs,
                             voice=download,
                         )
                     else:
-                        send = tg_bot.send_audio(
+                        sent = await tg_bot.send_audio(
                             **media_kwargs,
                             audio=download,
                         )
                 case wa_types.MessageType.STICKER:
-                    send = tg_bot.send_sticker(
+                    sent = await tg_bot.send_sticker(
                         **media_kwargs,
                         sticker=download,
                     )
@@ -84,14 +83,14 @@ def on_message(_: WhatsApp, msg: wa_types.Message):
             )
             match msg.type:
                 case wa_types.MessageType.TEXT:
-                    send = tg_bot.send_message(
+                    sent = await tg_bot.send_message(
                         **kwargs,
                         text=msg.text,
                     )
 
                 case wa_types.MessageType.CONTACTS:
                     for contact in msg.contacts:
-                        send = tg_bot.send_contact(
+                        sent = await tg_bot.send_contact(
                             **kwargs,
                             first_name=contact.name.first_name,
                             last_name=contact.name.last_name,
@@ -100,7 +99,7 @@ def on_message(_: WhatsApp, msg: wa_types.Message):
                         )
 
                 case wa_types.MessageType.LOCATION:
-                    send = tg_bot.send_location(
+                    sent = await tg_bot.send_location(
                         **kwargs,
                         latitude=msg.location.latitude,
                         longitude=msg.location.longitude,
@@ -108,14 +107,14 @@ def on_message(_: WhatsApp, msg: wa_types.Message):
 
                 case wa_types.MessageType.REACTION:
                     if msg.reaction.is_removed:
-                        tg_bot.set_reaction(
+                        await tg_bot.set_reaction(
                             chat_id=send_to,
                             message_id=reply_msg.topic_msg_id,
                             reaction=None,
                         )
                     else:
                         if msg.reaction.emoji in EMOJIS:
-                            tg_bot.set_reaction(
+                            await tg_bot.set_reaction(
                                 chat_id=send_to,
                                 message_id=reply_msg.topic_msg_id,
                                 reaction=[
@@ -123,7 +122,7 @@ def on_message(_: WhatsApp, msg: wa_types.Message):
                                 ],
                             )
                         else:
-                            tg_bot.send_message(
+                            await tg_bot.send_message(
                                 **kwargs,
                                 text=f"the user react {msg.reaction.emoji}",
                             )
@@ -136,9 +135,9 @@ def on_message(_: WhatsApp, msg: wa_types.Message):
         # TODO errors.exceptions.bad_request_400.ReactionEmpty
         _logger.error(e)
 
-    if send:
+    if sent:
         repositoy.create_message(
-            wa_id=wa_id, topic_id=topic_id, wa_msg_id=msg.id, topic_msg_id=send.id
+            wa_id=wa_id, topic_id=topic_id, wa_msg_id=msg.id, topic_msg_id=sent.id
         )
 
 

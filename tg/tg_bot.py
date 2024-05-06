@@ -14,7 +14,7 @@ wa_bot = clients.wa_bot
 settings = config.get_settings()
 
 
-def on_message(_: Client, msg: tg_types.Message):
+async def on_message(_: Client, msg: tg_types.Message):
     topic_id = (
         msg.message_thread_id if msg.message_thread_id else msg.reply_to_message_id
     )
@@ -54,13 +54,13 @@ def on_message(_: Client, msg: tg_types.Message):
             # check if media is more than 20MB
             media = getattr(msg, msg.media.name.lower())
             if (media.file_size or 0) > (20 * 1024 * 1024):
-                msg.reply(
+                await msg.reply(
                     "Media size is more than 20MB, can't send it to WhatsApp",
                     quote=True,
                 )
                 return
 
-            download = msg.download(in_memory=True)
+            download = await msg.download(in_memory=True)
             media_kwargs = dict(
                 **kwargs,
                 reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
@@ -134,7 +134,9 @@ def on_message(_: Client, msg: tg_types.Message):
                     )
                 case enums.MessageMediaType.STICKER:
                     if media.is_animated:
-                        msg.reply("Animated stickers are not supported", quote=True)
+                        await msg.reply(
+                            "Animated stickers are not supported", quote=True
+                        )
                         return
 
                     sent = wa_bot.send_sticker(
@@ -192,9 +194,9 @@ def on_message(_: Client, msg: tg_types.Message):
     except errors.WhatsAppError as e:
         _logger.error(e)
         if e.error_code == 100:
-            msg.reply("__Unsupported media type__", quote=True)
+            await msg.reply("__Unsupported media type__", quote=True)
         else:
-            msg.reply(f"Error: __{e}__", quote=True)
+            await msg.reply(f"Error: __{e}__", quote=True)
 
     if sent:
         repositoy.create_message(
@@ -205,8 +207,7 @@ def on_message(_: Client, msg: tg_types.Message):
         )
 
 
-def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
-    _logger.exception(reaction)
+async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
     if not reaction.new_reaction:
         try:
             msg = repositoy.get_message(
@@ -241,7 +242,7 @@ def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
             return
 
 
-def on_message_service(_: Client, msg: tg_types.Message):
+async def on_message_service(_: Client, msg: tg_types.Message):
     topic_id = (
         msg.message_thread_id if msg.message_thread_id else msg.reply_to_message_id
     )
@@ -255,13 +256,15 @@ def on_message_service(_: Client, msg: tg_types.Message):
         case enums.MessageServiceType.FORUM_TOPIC_CLOSED:
             if not topic.user.banned:
                 repositoy.update_user(wa_id=topic.user.wa_id, banned=True)
+                await msg.reply("User banned", quote=True)
 
         case enums.MessageServiceType.FORUM_TOPIC_REOPENED:
             if topic.user.banned:
                 repositoy.update_user(wa_id=topic.user.wa_id, banned=False)
+                await msg.reply("User unbanned", quote=True)
 
 
-def on_command(_: Client, msg: tg_types.Message):
+async def on_command(_: Client, msg: tg_types.Message):
     if not msg.text:
         return
 
@@ -276,10 +279,10 @@ def on_command(_: Client, msg: tg_types.Message):
 
     if msg.text.startswith("/info"):
         if topic is None:
-            msg.reply("No topic found", quote=True)
+            await msg.reply("No topic found", quote=True)
             return
 
-        msg.reply(
+        await msg.reply(
             text=f"**Name:** __{topic.user.name}__\n"
             f"**WhatsApp ID:** `{topic.user.wa_id}`\n"
             f"**Topic ID:** `{topic.topic_id}`\n"

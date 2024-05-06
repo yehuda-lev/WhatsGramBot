@@ -1,7 +1,7 @@
-pyrotgfork==2.1.27
+pyrotgfork==2.1.29
 TgCrypto==1.2.5
-pywa==1.18.1
-uvicorn==0.25.0
-fastapi==0.109.1
-SQLAlchemy==2.0.23
+https://github.com/david-lev/pywa/archive/91dcd480cc51e5bbae11d5035fc285f141bd3038.zip  # async
+uvicorn==0.29.0
+fastapi==0.111.0
+SQLAlchemy==2.0.30
 pydantic-settings==2.2.1
