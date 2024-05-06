@@ -5,7 +5,7 @@ from pyrogram import types as tg_types, Client, enums
 from pywa import types as wa_types, errors
 from sqlalchemy.exc import NoResultFound
 
-from data import clients, config, modules
+from data import clients, config, modules, utils
 from db import repositoy
 
 _logger = logging.getLogger(__name__)
@@ -39,6 +39,12 @@ async def on_message(_: Client, msg: tg_types.Message):
 
     kwargs = dict(to=wa_id, tracker=modules.Tracker(chat_id=msg.chat.id, msg_id=msg.id))
 
+    text = (
+        utils.get_tg_text_to_wa(msg.text.markdown or msg.caption.markdown)
+        if msg.text or msg.caption
+        else None
+    )
+
     try:
         if msg.media in (
             enums.MessageMediaType.PHOTO,
@@ -64,7 +70,7 @@ async def on_message(_: Client, msg: tg_types.Message):
             media_kwargs = dict(
                 **kwargs,
                 reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
-                caption=msg.caption,
+                caption=text,
             )
 
             match msg.media:
@@ -152,7 +158,7 @@ async def on_message(_: Client, msg: tg_types.Message):
             if msg.text:
                 sent = wa_bot.send_message(
                     **kwargs,
-                    text=msg.text,
+                    text=text,
                     reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
                 )
             elif msg.location or msg.venue:

@@ -5,7 +5,7 @@ from pywa import types as wa_types, WhatsApp
 from pyrogram import types as tg_types, errors
 from sqlalchemy.exc import NoResultFound
 
-from data import clients, config
+from data import clients, config, utils
 from db import repositoy
 
 _logger = logging.getLogger(__name__)
@@ -28,17 +28,28 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
         except NoResultFound:
             pass
 
+    kwargs = dict(
+        chat_id=send_to,
+        reply_parameters=tg_types.ReplyParameters(
+            message_id=reply_msg.topic_msg_id if reply_msg else topic_id
+        ),
+    )
+
+    text = (
+        utils.get_wa_text_to_tg(msg.text or msg.caption)
+        if msg.text or msg.caption
+        else None
+    )
+
     try:
         if msg.has_media:
             download = io.BytesIO(msg.download_media(in_memory=True))
             download.name = f"{msg.type}{msg.media.extension}"
             media_kwargs = dict(
-                chat_id=send_to,
-                caption=msg.text,
-                reply_parameters=tg_types.ReplyParameters(
-                    message_id=reply_msg.topic_msg_id if reply_msg else topic_id
-                ),
+                **kwargs,
+                caption=text,
             )
+
             match msg.type:
                 case wa_types.MessageType.IMAGE:
                     sent = await tg_bot.send_photo(
@@ -74,18 +85,13 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                 case _:
                     _logger.warning(f"Unsupported media type: {msg.type}")
                     return
+
         else:
-            kwargs = dict(
-                chat_id=send_to,
-                reply_parameters=tg_types.ReplyParameters(
-                    message_id=reply_msg.topic_msg_id if reply_msg else topic_id
-                ),
-            )
             match msg.type:
                 case wa_types.MessageType.TEXT:
                     sent = await tg_bot.send_message(
                         **kwargs,
-                        text=msg.text,
+                        text=text,
                     )
 
                 case wa_types.MessageType.CONTACTS:
