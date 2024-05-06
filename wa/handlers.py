@@ -68,7 +68,7 @@ def on_failed_status(_: WhatsApp, status: wa_types.MessageStatus[modules.Tracker
 
 HANDLERS = [
     handlers.MessageHandler(
-        wa_bot.echo,
+        wa_bot.on_message,
         create_user,
     ),
     handlers.MessageStatusHandler(

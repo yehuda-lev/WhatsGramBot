@@ -14,7 +14,7 @@ wa_bot = clients.wa_bot
 settings = config.get_settings()
 
 
-def echo(_: Client, msg: tg_types.Message):
+def on_message(_: Client, msg: tg_types.Message):
     topic_id = (
         msg.message_thread_id if msg.message_thread_id else msg.reply_to_message_id
     )
@@ -239,3 +239,66 @@ def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
             )
         except NoResultFound:
             return
+
+
+def on_message_service(_: Client, msg: tg_types.Message):
+    topic_id = (
+        msg.message_thread_id if msg.message_thread_id else msg.reply_to_message_id
+    )
+
+    try:
+        topic = repositoy.get_topic_by_topic_id(topic_id=topic_id)
+    except NoResultFound:
+        return
+
+    match msg.service:
+        case enums.MessageServiceType.FORUM_TOPIC_CLOSED:
+            if not topic.user.banned:
+                repositoy.update_user(wa_id=topic.user.wa_id, banned=True)
+
+        case enums.MessageServiceType.FORUM_TOPIC_REOPENED:
+            if topic.user.banned:
+                repositoy.update_user(wa_id=topic.user.wa_id, banned=False)
+
+
+def on_command(_: Client, msg: tg_types.Message):
+    if not msg.text:
+        return
+
+    topic_id = (
+        msg.message_thread_id if msg.message_thread_id else msg.reply_to_message_id
+    )
+
+    try:
+        topic = repositoy.get_topic_by_topic_id(topic_id=topic_id)
+    except NoResultFound:
+        topic = None
+
+    if msg.text.startswith("/info"):
+        if topic is None:
+            msg.reply("No topic found", quote=True)
+            return
+
+        msg.reply(
+            text=f"**Name:** __{topic.user.name}__\n"
+            f"**WhatsApp ID:** `{topic.user.wa_id}`\n"
+            f"**Topic ID:** `{topic.topic_id}`\n"
+            f"**Banned:** __{topic.user.banned}__\n"
+            f"**Active:** __{topic.user.active}__\n"
+            f"**Created:** __{topic.created_at}__\n",
+            quote=True,
+            reply_markup=tg_types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        tg_types.InlineKeyboardButton(
+                            text="WhatsApp", url=f"https://wa.me/{topic.user.wa_id}"
+                        ),
+                        tg_types.InlineKeyboardButton(
+                            text="Topic",
+                            url=f"https://t.me/c/{str(settings.tg_group_topic_id).replace('-100', '')}"
+                            f"/{topic.topic_id}",
+                        ),
+                    ]
+                ]
+            ),
+        )
