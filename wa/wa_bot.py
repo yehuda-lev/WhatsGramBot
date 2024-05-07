@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import typing
@@ -5,7 +6,7 @@ from pywa import types as wa_types, WhatsApp
 from pyrogram import types as tg_types, errors
 from sqlalchemy.exc import NoResultFound
 
-from data import clients, config, utils
+from data import clients, config, utils, modules
 from db import repositoy
 
 _logger = logging.getLogger(__name__)
@@ -13,6 +14,24 @@ _logger = logging.getLogger(__name__)
 tg_bot = clients.tg_bot
 settings = config.get_settings()
 send_to = settings.tg_group_topic_id
+
+
+async def get_chat_opened(_: WhatsApp, __: wa_types.ChatOpened):
+    pass
+
+
+async def on_command_start(_: WhatsApp, msg: wa_types.Message):
+    # get text welcome message
+    try:
+        text_welcome = repositoy.get_message_to_send(
+            type_event=modules.EventType.MSG_WELCOME
+        )
+    except NoResultFound:
+        text_welcome = None
+
+    if text_welcome:
+        msg.mark_as_read()
+        msg.reply(text_welcome.text)
 
 
 async def get_message(_: WhatsApp, msg: wa_types.Message):
@@ -41,110 +60,122 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
         else None
     )
 
-    try:
-        if msg.has_media:
-            download = io.BytesIO(msg.download_media(in_memory=True))
-            download.name = f"{msg.type}{msg.media.extension}"
-            media_kwargs = dict(
-                **kwargs,
-                caption=text,
-            )
+    while True:
+        try:
+            if msg.has_media:
+                download = io.BytesIO(msg.download_media(in_memory=True))
+                download.name = f"{msg.type}{msg.media.extension}"
+                media_kwargs = dict(
+                    **kwargs,
+                    caption=text,
+                )
 
-            match msg.type:
-                case wa_types.MessageType.IMAGE:
-                    sent = await tg_bot.send_photo(
-                        **media_kwargs,
-                        photo=download,
-                    )
-                case wa_types.MessageType.VIDEO:
-                    sent = await tg_bot.send_video(
-                        **media_kwargs,
-                        video=download,
-                    )
-                case wa_types.MessageType.DOCUMENT:
-                    sent = await tg_bot.send_document(
-                        **media_kwargs,
-                        document=download,
-                    )
-                case wa_types.MessageType.AUDIO:
-                    if msg.media.voice:
-                        sent = await tg_bot.send_voice(
+                match msg.type:
+                    case wa_types.MessageType.IMAGE:
+                        sent = await tg_bot.send_photo(
                             **media_kwargs,
-                            voice=download,
+                            photo=download,
                         )
-                    else:
-                        sent = await tg_bot.send_audio(
+                    case wa_types.MessageType.VIDEO:
+                        sent = await tg_bot.send_video(
                             **media_kwargs,
-                            audio=download,
+                            video=download,
                         )
-                case wa_types.MessageType.STICKER:
-                    sent = await tg_bot.send_sticker(
-                        **media_kwargs,
-                        sticker=download,
-                    )
-                case _:
-                    _logger.warning(f"Unsupported media type: {msg.type}")
-                    return
+                    case wa_types.MessageType.DOCUMENT:
+                        sent = await tg_bot.send_document(
+                            **media_kwargs,
+                            document=download,
+                        )
+                    case wa_types.MessageType.AUDIO:
+                        if msg.media.voice:
+                            sent = await tg_bot.send_voice(
+                                **media_kwargs,
+                                voice=download,
+                            )
+                        else:
+                            sent = await tg_bot.send_audio(
+                                **media_kwargs,
+                                audio=download,
+                            )
+                    case wa_types.MessageType.STICKER:
+                        sent = await tg_bot.send_sticker(
+                            **media_kwargs,
+                            sticker=download,
+                        )
+                    case _:
+                        _logger.warning(f"Unsupported media type: {msg.type}")
+                        return
 
-        else:
-            match msg.type:
-                case wa_types.MessageType.TEXT:
-                    sent = await tg_bot.send_message(
-                        **kwargs,
-                        text=text,
-                    )
-
-                case wa_types.MessageType.CONTACTS:
-                    for contact in msg.contacts:
-                        sent = await tg_bot.send_contact(
+            else:
+                match msg.type:
+                    case wa_types.MessageType.TEXT:
+                        sent = await tg_bot.send_message(
                             **kwargs,
-                            first_name=contact.name.first_name,
-                            last_name=contact.name.last_name,
-                            phone_number=typing.cast(tuple, contact.phones)[0].phone,
-                            vcard=contact.as_vcard(),
+                            text=text,
                         )
 
-                case wa_types.MessageType.LOCATION:
-                    sent = await tg_bot.send_location(
-                        **kwargs,
-                        latitude=msg.location.latitude,
-                        longitude=msg.location.longitude,
-                    )
+                    case wa_types.MessageType.CONTACTS:
+                        for contact in msg.contacts:
+                            sent = await tg_bot.send_contact(
+                                **kwargs,
+                                first_name=contact.name.first_name,
+                                last_name=contact.name.last_name,
+                                phone_number=typing.cast(tuple, contact.phones)[
+                                    0
+                                ].phone,
+                                vcard=contact.as_vcard(),
+                            )
 
-                case wa_types.MessageType.REACTION:
-                    if msg.reaction.is_removed:
-                        await tg_bot.set_reaction(
-                            chat_id=send_to,
-                            message_id=reply_msg.topic_msg_id,
-                            reaction=None,
+                    case wa_types.MessageType.LOCATION:
+                        sent = await tg_bot.send_location(
+                            **kwargs,
+                            latitude=msg.location.latitude,
+                            longitude=msg.location.longitude,
                         )
-                    else:
-                        if msg.reaction.emoji in EMOJIS:
+
+                    case wa_types.MessageType.REACTION:
+                        if msg.reaction.is_removed:
                             await tg_bot.set_reaction(
                                 chat_id=send_to,
                                 message_id=reply_msg.topic_msg_id,
-                                reaction=[
-                                    tg_types.ReactionTypeEmoji(emoji=msg.reaction.emoji)
-                                ],
+                                reaction=None,
                             )
                         else:
-                            await tg_bot.send_message(
-                                **kwargs,
-                                text=f"the user react {msg.reaction.emoji}",
-                            )
+                            if msg.reaction.emoji in EMOJIS:
+                                await tg_bot.set_reaction(
+                                    chat_id=send_to,
+                                    message_id=reply_msg.topic_msg_id,
+                                    reaction=[
+                                        tg_types.ReactionTypeEmoji(
+                                            emoji=msg.reaction.emoji
+                                        )
+                                    ],
+                                )
+                            else:
+                                await tg_bot.send_message(
+                                    **kwargs,
+                                    text=f"the user react {msg.reaction.emoji}",
+                                )
 
-                case _:
-                    _logger.warning(f"Unsupported message type: {msg.type}")
-                    return
+                    case _:
+                        _logger.warning(f"Unsupported message type: {msg.type}")
+                        return
 
-    except errors.BadRequest as e:
-        # TODO errors.exceptions.bad_request_400.ReactionEmpty
-        _logger.error(e)
+        except errors.FloodWait as e:
+            await asyncio.sleep(e.value)
+            continue
 
-    if sent:
-        repositoy.create_message(
-            wa_id=wa_id, topic_id=topic_id, wa_msg_id=msg.id, topic_msg_id=sent.id
-        )
+        except errors.ReactionEmpty:
+            pass
+
+        except Exception as e:
+            _logger.exception(e)
+
+        if sent:
+            repositoy.create_message(
+                wa_id=wa_id, topic_id=topic_id, wa_msg_id=msg.id, topic_msg_id=sent.id
+            )
+        break
 
 
 EMOJIS = [
