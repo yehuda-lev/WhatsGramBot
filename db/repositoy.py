@@ -1,10 +1,12 @@
 import logging
 import datetime
 
-from data import modules
+from data import modules, cache_memory
 from db.tables import get_session, WaUser, Topic, Message, MessageToSend, Settings
 
+
 _logger = logging.getLogger(__name__)
+cache = cache_memory.my_cache
 
 
 def create_user_and_topic(wa_id: str, name: str, topic_id: int):
@@ -15,7 +17,16 @@ def create_user_and_topic(wa_id: str, name: str, topic_id: int):
     :param topic_id: the id of the topic
     :return:
     """
+
     _logger.debug(f"create user wa_id:{wa_id}, name:{name}, topic_id:{topic_id}")
+    cache.delete(
+        cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=wa_id)
+    )
+    cache.delete(
+        cache_name="get_topic_by_topic_id",
+        cache_id=cache.build_cache_id(topic_id=topic_id),
+    )
+
     with get_session() as session:
         topic = Topic(
             topic_id=topic_id,
@@ -33,16 +44,19 @@ def create_user_and_topic(wa_id: str, name: str, topic_id: int):
         session.commit()
 
 
+@cache.cachable(cache_name="get_user_by_wa_id", params=("wa_id",))
 def get_user_by_wa_id(*, wa_id: str) -> WaUser:
     """
     Get user by wa_id
     :param wa_id: the number of the user
     :return: the user
     """
+    _logger.info("get_user_by_wa_id")
     with get_session() as session:
         return session.query(WaUser).filter(WaUser.wa_id == wa_id).one()
 
 
+@cache.cachable(cache_name="get_topic_by_topic_id", params=("topic_id",))
 def get_topic_by_topic_id(*, topic_id: int) -> Topic:
     """
     Get topic by topic_id
@@ -60,7 +74,12 @@ def update_user(*, wa_id: str, **kwargs):
     :param kwargs: the fields to update
     :return:
     """
+
     _logger.debug(f"update user wa_id:{wa_id}, kwargs:{kwargs}")
+    cache.delete(
+        cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=wa_id)
+    )
+
     with get_session() as session:
         session.query(WaUser).filter(WaUser.wa_id == wa_id).update(kwargs)
         session.commit()
@@ -73,7 +92,13 @@ def update_topic(*, topic_id: int, **kwargs):
     :param kwargs: the fields to update
     :return:
     """
+
     _logger.debug(f"update topic topic_id:{topic_id}, kwargs:{kwargs}")
+    cache.delete(
+        cache_name="get_topic_by_topic_id",
+        cache_id=cache.build_cache_id(topic_id=topic_id),
+    )
+
     with get_session() as session:
         session.query(Topic).filter(Topic.topic_id == topic_id).update(kwargs)
         session.commit()
@@ -109,6 +134,7 @@ def create_message(*, wa_id: str, topic_id: int, wa_msg_id: str, topic_msg_id: i
         session.commit()
 
 
+@cache.cachable(cache_name="get_message", params=("topic_msg_id", "wa_msg_id"))
 def get_message(*, topic_msg_id: int | None, wa_msg_id: str | None) -> Message:
     """
     Get message by topic_msg_id or wa_msg_id
@@ -136,7 +162,13 @@ def create_message_to_send(*, type_event: modules.EventType, text: str):
     :param text: the text of the message
     :return:
     """
+
     _logger.debug(f"create message to send, type_event:{type_event}, text:{text}")
+    cache.delete(
+        cache_name="get_message_to_send",
+        cache_id=cache.build_cache_id(type_event=type_event),
+    )
+
     with get_session() as session:
         message_to_send = MessageToSend(
             type_event=type_event,
@@ -148,6 +180,7 @@ def create_message_to_send(*, type_event: modules.EventType, text: str):
         session.commit()
 
 
+@cache.cachable(cache_name="get_message_to_send", params=("type_event",))
 def get_message_to_send(*, type_event: str) -> MessageToSend:
     """
     Get message to send by type_event
@@ -169,7 +202,13 @@ def update_message_to_send(*, type_event: str, **kwargs):
     :param kwargs: the fields to update
     :return:
     """
+
     _logger.debug(f"update message to send, type_event:{type_event}, kwargs:{kwargs}")
+    cache.delete(
+        cache_name="get_message_to_send",
+        cache_id=cache.build_cache_id(type_event=type_event),
+    )
+
     with get_session() as session:
         session.query(MessageToSend).filter(
             MessageToSend.type_event == type_event
@@ -187,9 +226,12 @@ def create_settings(*, chat_opened_enable: bool = False, welcome_msg: bool = Fal
     :param welcome_msg: the status of the welcome message
     :return:
     """
+
     _logger.debug(
         f"create settings, chat_opened_enable:{chat_opened_enable}, welcome_msg:{welcome_msg}"
     )
+    cache.delete(cache_name="get_settings")
+
     with get_session() as session:
         settings = Settings(
             chat_opened_enable=chat_opened_enable,
@@ -200,6 +242,7 @@ def create_settings(*, chat_opened_enable: bool = False, welcome_msg: bool = Fal
         session.commit()
 
 
+@cache.cachable(cache_name="get_settings")
 def get_settings() -> Settings:
     """
     Get settings
@@ -215,7 +258,9 @@ def update_settings(**kwargs):
     :param kwargs: the fields to update
     :return:
     """
+
     _logger.debug(f"update settings, kwargs:{kwargs}")
+    cache.delete(cache_name="get_settings")
     with get_session() as session:
         session.query(Settings).update(kwargs)
         session.commit()
