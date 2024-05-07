@@ -11,6 +11,8 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from data import modules
+
 
 _logger = logging.getLogger(__name__)
 
@@ -83,6 +85,27 @@ class Message(BaseTable):
     topic: Mapped[Topic] = relationship(back_populates="messages", lazy="joined")
     user_id: Mapped[int] = mapped_column(ForeignKey("wa_user.id"))
     user: Mapped[WaUser] = relationship(back_populates="messages", lazy="joined")
+
+
+class MessageToSend(BaseTable):
+    """Send message details"""
+
+    __tablename__ = "message_to_send"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    type_event: Mapped[modules.EventType] = mapped_column(unique=True)
+    text: Mapped[str]
+    created_at: Mapped[datetime.datetime]
+
+
+class Settings(BaseTable):
+    """Settings details"""
+
+    __tablename__ = "settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    chat_opened_enable: Mapped[bool] = mapped_column(default=False)
+    welcome_msg: Mapped[bool] = mapped_column(default=False)
 
 
 BaseTable.metadata.create_all(engine)

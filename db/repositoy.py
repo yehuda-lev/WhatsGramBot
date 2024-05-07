@@ -1,8 +1,8 @@
 import logging
 import datetime
 
-from db.tables import get_session, WaUser, Topic, Message
-
+from data import modules
+from db.tables import get_session, WaUser, Topic, Message, MessageToSend, Settings
 
 _logger = logging.getLogger(__name__)
 
@@ -79,6 +79,9 @@ def update_topic(*, topic_id: int, **kwargs):
         session.commit()
 
 
+# message
+
+
 def create_message(*, wa_id: str, topic_id: int, wa_msg_id: str, topic_msg_id: int):
     """
     Create message
@@ -121,3 +124,98 @@ def get_message(*, topic_msg_id: int | None, wa_msg_id: str | None) -> Message:
                 .one()
             )
         return session.query(Message).filter(Message.wa_msg_id == wa_msg_id).one()
+
+
+# message to send
+
+
+def create_message_to_send(*, type_event: modules.EventType, text: str):
+    """
+    Create message to send
+    :param type_event: the type of the event
+    :param text: the text of the message
+    :return:
+    """
+    _logger.debug(f"create message to send, type_event:{type_event}, text:{text}")
+    with get_session() as session:
+        message_to_send = MessageToSend(
+            type_event=type_event,
+            text=text,
+            created_at=datetime.datetime.now(),
+        )
+
+        session.add(message_to_send)
+        session.commit()
+
+
+def get_message_to_send(*, type_event: str) -> MessageToSend:
+    """
+    Get message to send by type_event
+    :param type_event: the type of the event
+    :return: the message to send
+    """
+    with get_session() as session:
+        return (
+            session.query(MessageToSend)
+            .filter(MessageToSend.type_event == type_event)
+            .one()
+        )
+
+
+def update_message_to_send(*, type_event: str, **kwargs):
+    """
+    Update message to send
+    :param type_event: the type of the event
+    :param kwargs: the fields to update
+    :return:
+    """
+    _logger.debug(f"update message to send, type_event:{type_event}, kwargs:{kwargs}")
+    with get_session() as session:
+        session.query(MessageToSend).filter(
+            MessageToSend.type_event == type_event
+        ).update(kwargs)
+        session.commit()
+
+
+# settings
+
+
+def create_settings(*, chat_opened_enable: bool = False, welcome_msg: bool = False):
+    """
+    Create settings
+    :param chat_opened_enable: the status of the chat
+    :param welcome_msg: the status of the welcome message
+    :return:
+    """
+    _logger.debug(
+        f"create settings, chat_opened_enable:{chat_opened_enable}, welcome_msg:{welcome_msg}"
+    )
+    with get_session() as session:
+        settings = Settings(
+            chat_opened_enable=chat_opened_enable,
+            welcome_msg=welcome_msg,
+        )
+
+        session.add(settings)
+        session.commit()
+
+
+def get_settings() -> Settings:
+    """
+    Get settings
+    :return: the settings
+    """
+    with get_session() as session:
+        return session.query(Settings).one()
+
+
+def update_settings(**kwargs):
+    """
+    Update settings
+    :param kwargs: the fields to update
+    :return:
+    """
+    _logger.debug(f"update settings, kwargs:{kwargs}")
+    with get_session() as session:
+        session.query(Settings).update(kwargs)
+        session.commit()
