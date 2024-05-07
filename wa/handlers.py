@@ -84,7 +84,8 @@ async def create_user(_: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened) 
 
 
 async def on_failed_status(
-    _: WhatsApp, status: wa_types.MessageStatus[modules.Tracker]
+    _: WhatsApp,
+    status: wa_types.MessageStatus,  # TODO [modules.Tracker]
 ):
     await tg_bot.send_message(
         chat_id=status.tracker.chat_id,

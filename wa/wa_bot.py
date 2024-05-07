@@ -42,7 +42,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
     reply_msg = None
     if msg.is_reply:
         try:
-            reply_to = msg.message_id_to_reply
+            reply_to = msg.reply_to_message.message_id
             reply_msg = repositoy.get_message(wa_msg_id=reply_to, topic_msg_id=None)
         except NoResultFound:
             pass
@@ -63,7 +63,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
     while True:
         try:
             if msg.has_media:
-                download = io.BytesIO(await msg.download_media(in_memory=True))  # TODO not working
+                download = io.BytesIO(await msg.download_media(in_memory=True))
                 download.name = f"{msg.type}{msg.media.extension}"
                 media_kwargs = dict(
                     **kwargs,
