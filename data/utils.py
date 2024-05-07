@@ -53,3 +53,39 @@ def get_wa_text_to_tg(text: str) -> str:
     text = re.sub(whatsapp_strikethrough, r"~~\1~~", text)
 
     return text
+
+
+# listener
+
+
+user_id_to_state: dict[str | int : dict] = {}
+"""example: {user_id: {answer_type: modules.EventType.MSG_WELCOME}}"""
+
+
+def is_answer(**kwargs):
+    """example: is_answer(answer_type=modules.EventType.MSG_WELCOME)"""
+
+    def get_answer(_, __, msg) -> bool:
+        user_id = msg.from_user.id
+        exists = user_id_to_state.get(user_id)
+        if exists:
+            return all(exists.get(key, False) == value for key, value in kwargs.items())
+        return False
+
+    return get_answer
+
+
+def add_listener(*, user_id: str | int, data: dict):
+    """example: {9721234567: {answer_type: modules.EventType.MSG_WELCOME}}"""
+    user_id_to_state.update({user_id: data})
+
+
+def remove_listener(*, user_id: str | int):
+    try:
+        del user_id_to_state[user_id]
+    except KeyError:
+        pass
+
+
+def get_listener(user_id: str | int) -> dict:
+    return user_id_to_state[user_id]

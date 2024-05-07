@@ -1,3 +1,5 @@
+import enum
+
 from pywa import types as wa_types
 from dataclasses import dataclass
 
@@ -8,3 +10,9 @@ class Tracker(wa_types.CallbackData):
 
     chat_id: int
     msg_id: int
+
+
+class EventType(str, enum.Enum):
+    """Event types."""
+
+    MSG_WELCOME = enum.auto()

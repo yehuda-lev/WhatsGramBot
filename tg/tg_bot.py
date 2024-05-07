@@ -270,7 +270,7 @@ async def on_message_service(_: Client, msg: tg_types.Message):
                 await msg.reply("User unbanned", quote=True)
 
 
-async def on_command(_: Client, msg: tg_types.Message):
+async def on_command(client: Client, msg: tg_types.Message):
     if not msg.text:
         return
 
@@ -311,3 +311,143 @@ async def on_command(_: Client, msg: tg_types.Message):
                 ]
             ),
         )
+
+    elif msg.text.startswith("/settings"):
+        # check if the user is admin in the group
+        user = await client.get_chat_member(msg.chat.id, msg.from_user.id)
+        if user.status not in (
+            enums.ChatMemberStatus.OWNER,
+            enums.ChatMemberStatus.ADMINISTRATOR,
+        ):
+            await msg.reply("You are not admin in the group", quote=True)
+            return
+
+        try:
+            db_settings = repositoy.get_settings()
+            chat_opened_enable = db_settings.chat_opened_enable
+            welcome_msg = db_settings.welcome_msg
+        except NoResultFound:
+            repositoy.create_settings()
+            chat_opened_enable = False
+            welcome_msg = False
+
+        await msg.reply(
+            text=f"**Settings**\n"
+            f"**Chat opened enable:** __{chat_opened_enable}__\n"
+            f"> if chat opened is active - the bot will create topic when user open chat. "
+            f"else - the bot will create topic only if user send message\n\n"
+            f"**Welcome message:** __{welcome_msg}__\n"
+            f"> if welcome message is active - the bot will send welcome message when the topic is created\n\n"
+            f"__Tap on the button to change the settings__",
+            quote=True,
+            reply_markup=tg_types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        tg_types.InlineKeyboardButton(
+                            text=f"Chat opened: {'❌' if chat_opened_enable else '✅'}",
+                            callback_data=f"settings_chat_opened_enable_{'Disable' if chat_opened_enable else 'Enable'}",
+                        ),
+                    ],
+                    [
+                        tg_types.InlineKeyboardButton(
+                            text=f"Welcome message {'❌' if welcome_msg else '✅'}",
+                            callback_data=f"settings_welcome_msg_{'Disable' if welcome_msg else 'Enable'}",
+                        ),
+                    ],
+                    [
+                        tg_types.InlineKeyboardButton(
+                            text="Change message welcome",
+                            callback_data="settings_change_msg_welcome",
+                        ),
+                    ],
+                ]
+            ),
+        )
+
+
+async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
+    cbd_data = cbd.data
+
+    if cbd_data.startswith("settings"):
+        if cbd_data.startswith("settings_chat_opened_enable"):
+            chat_opened_enable = cbd_data.split("_")[-1].lower() == "enable"
+            repositoy.update_settings(chat_opened_enable=chat_opened_enable)
+
+            # update the chat_opened in the bot on WhatsApp
+            clients.wa_bot.update_conversational_automation(
+                enable_chat_opened=chat_opened_enable,
+                ice_breakers=None,
+                commands=[wa_types.Command("start", "start")],
+            )
+
+            await cbd.message.edit_text(
+                f"Chat opened is {'enabled' if chat_opened_enable else 'disabled'} now"
+            )
+
+        elif cbd_data.startswith("settings_welcome_msg"):
+            welcome_msg = cbd_data.split("_")[-1].lower() == "enable"
+            repositoy.update_settings(welcome_msg=welcome_msg)
+            await cbd.message.edit_text(
+                f"Welcome message is {'enabled' if welcome_msg else 'disabled'} now"
+            )
+
+        elif cbd_data.startswith("settings_change_msg_welcome"):
+            message_to_send = None
+            try:
+                message_to_send = repositoy.get_message_to_send(
+                    type_event=modules.EventType.MSG_WELCOME
+                )
+            except NoResultFound:
+                await cbd.answer("No welcome message found")
+
+            if message_to_send:  # send the message tht exist
+                await cbd.message.reply(text="__The current welcome message is:__")
+                await cbd.message.reply(text=message_to_send.text)
+
+            await cbd.message.reply(
+                text="Send the new welcome message",
+                reply_markup=tg_types.InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            tg_types.InlineKeyboardButton(
+                                text="Cancel", callback_data="cancel_listen"
+                            )
+                        ]
+                    ]
+                ),
+            )
+            await cbd.message.edit_text("⚡️")
+
+            # start listening
+            utils.add_listener(
+                user_id=cbd.from_user.id,
+                data={"answer_type": modules.EventType.MSG_WELCOME},
+            )
+
+    elif cbd_data == "cancel_listen":
+        utils.remove_listener(user_id=cbd.from_user.id)  # remove listener
+        await cbd.message.reply("Canceled")
+
+
+async def on_listen(_: Client, msg: tg_types.Message):
+    if not msg.from_user:
+        await msg.reply("User not found")
+        return
+    user_id = msg.from_user.id
+    data = utils.get_listener(user_id=user_id)
+    utils.remove_listener(user_id=user_id)
+
+    if data.get("answer_type") == modules.EventType.MSG_WELCOME:
+        text = msg.text.markdown or msg.caption.markdown
+
+        try:
+            repositoy.get_message_to_send(type_event=modules.EventType.MSG_WELCOME)
+            repositoy.update_message_to_send(
+                type_event=modules.EventType.MSG_WELCOME, text=text
+            )
+        except NoResultFound:
+            repositoy.create_message_to_send(
+                type_event=modules.EventType.MSG_WELCOME, text=text
+            )
+
+        await msg.reply("Welcome message updated", quote=True)
