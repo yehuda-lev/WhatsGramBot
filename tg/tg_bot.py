@@ -2,7 +2,7 @@ import logging
 import mimetypes
 
 from pyrogram import types as tg_types, Client, enums
-from pywa import types as wa_types, errors
+from pywa_async import types as wa_types, errors
 from sqlalchemy.exc import NoResultFound
 
 from data import clients, config, modules, utils
@@ -75,12 +75,12 @@ async def on_message(_: Client, msg: tg_types.Message):
 
             match msg.media:
                 case enums.MessageMediaType.PHOTO:
-                    sent = wa_bot.send_image(
+                    sent = await wa_bot.send_image(
                         **media_kwargs, image=download, mime_type="image/jpeg"
                     )
 
                 case enums.MessageMediaType.VIDEO:
-                    sent = wa_bot.send_video(
+                    sent = await wa_bot.send_video(
                         **media_kwargs,
                         video=download,
                         mime_type=msg.video.mime_type or "video/mp4",
@@ -88,13 +88,13 @@ async def on_message(_: Client, msg: tg_types.Message):
 
                 case enums.MessageMediaType.STORY:
                     if msg.story.video:
-                        sent = wa_bot.send_video(
+                        sent = await wa_bot.send_video(
                             **media_kwargs,
                             video=download,
                             mime_type=media.mime_type or "video/mp4",
                         )
                     elif msg.story.photo:
-                        sent = wa_bot.send_image(
+                        sent = await wa_bot.send_image(
                             **media_kwargs, photo=download, mime_type="image/jpeg"
                         )
                     else:
@@ -102,21 +102,21 @@ async def on_message(_: Client, msg: tg_types.Message):
                         return
 
                 case enums.MessageMediaType.ANIMATION:
-                    sent = wa_bot.send_video(
+                    sent = await wa_bot.send_video(
                         **media_kwargs,
                         video=download,
                         mime_type=media.mime_type or "video/mp4",
                     )
 
                 case enums.MessageMediaType.VIDEO_NOTE:
-                    sent = wa_bot.send_video(
+                    sent = await wa_bot.send_video(
                         **media_kwargs,
                         video=download,
                         mime_type=media.mime_type or "video/mp4",
                     )
 
                 case enums.MessageMediaType.DOCUMENT:
-                    sent = wa_bot.send_document(
+                    sent = await wa_bot.send_document(
                         **media_kwargs,
                         document=download,
                         filename=media.file_name,
@@ -127,13 +127,13 @@ async def on_message(_: Client, msg: tg_types.Message):
 
                 # with no caption
                 case enums.MessageMediaType.AUDIO:
-                    sent = wa_bot.send_audio(
+                    sent = await wa_bot.send_audio(
                         **kwargs,
                         audio=download,
                         mime_type=media.mime_type or "audio/mpeg",
                     )
                 case enums.MessageMediaType.VOICE:
-                    sent = wa_bot.send_audio(
+                    sent = await wa_bot.send_audio(
                         **kwargs,
                         audio=download,
                         mime_type=media.mime_type or "audio/ogg",
@@ -145,24 +145,23 @@ async def on_message(_: Client, msg: tg_types.Message):
                         )
                         return
 
-                    sent = wa_bot.send_sticker(
+                    sent = await wa_bot.send_sticker(
                         **kwargs,
                         sticker=download,
                         mime_type=media.mime_type or "image/webp",
                     )
                 case _:
-                    _logger.warning(f"Unsupported media type: {msg.media}")
                     return
 
         else:
             if msg.text:
-                sent = wa_bot.send_message(
+                sent = await wa_bot.send_message(
                     **kwargs,
                     text=text,
                     reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
                 )
             elif msg.location or msg.venue:
-                sent = wa_bot.send_location(
+                sent = await wa_bot.send_location(
                     **kwargs,
                     latitude=msg.location.latitude
                     if msg.location
@@ -174,8 +173,7 @@ async def on_message(_: Client, msg: tg_types.Message):
                     address=msg.venue.address if msg.venue else None,
                 )
             elif msg.contact:
-                _logger.exception(msg.contact.phone_number)
-                sent = wa_bot.send_contact(
+                sent = await wa_bot.send_contact(
                     **kwargs,
                     reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
                     contact=wa_types.Contact(
@@ -198,10 +196,10 @@ async def on_message(_: Client, msg: tg_types.Message):
                     ),
                 )
     except errors.WhatsAppError as e:
-        _logger.error(e)
         if e.error_code == 100:
             await msg.reply("__Unsupported media type__", quote=True)
         else:
+            _logger.exception(e)
             await msg.reply(f"Error: __{e}__", quote=True)
 
     if sent:
@@ -219,7 +217,7 @@ async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
             msg = repositoy.get_message(
                 topic_msg_id=reaction.message_id, wa_msg_id=None
             )
-            wa_bot.remove_reaction(
+            await wa_bot.remove_reaction(
                 to=msg.user.wa_id,
                 message_id=msg.wa_msg_id,
                 tracker=modules.Tracker(
@@ -236,7 +234,7 @@ async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
             msg = repositoy.get_message(
                 topic_msg_id=reaction.message_id, wa_msg_id=None
             )
-            wa_bot.send_reaction(
+            await wa_bot.send_reaction(
                 to=msg.user.wa_id,
                 message_id=msg.wa_msg_id,
                 emoji=reaction.new_reaction[-1].emoji,
@@ -271,9 +269,6 @@ async def on_message_service(_: Client, msg: tg_types.Message):
 
 
 async def on_command(client: Client, msg: tg_types.Message):
-    if not msg.text:
-        return
-
     topic_id = (
         msg.message_thread_id if msg.message_thread_id else msg.reply_to_message_id
     )
@@ -374,7 +369,7 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
             repositoy.update_settings(chat_opened_enable=chat_opened_enable)
 
             # update the chat_opened in the bot on WhatsApp
-            clients.wa_bot.update_conversational_automation(
+            await wa_bot.update_conversational_automation(
                 enable_chat_opened=chat_opened_enable,
                 ice_breakers=None,
                 commands=[wa_types.Command("start", "start")],

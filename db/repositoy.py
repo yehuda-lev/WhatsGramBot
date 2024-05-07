@@ -51,7 +51,7 @@ def get_user_by_wa_id(*, wa_id: str) -> WaUser:
     :param wa_id: the number of the user
     :return: the user
     """
-    _logger.info("get_user_by_wa_id")
+
     with get_session() as session:
         return session.query(WaUser).filter(WaUser.wa_id == wa_id).one()
 

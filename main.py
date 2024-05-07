@@ -3,7 +3,7 @@ import threading
 from logging.handlers import RotatingFileHandler
 import uvicorn
 from pyrogram import __version__ as tg_version, idle, raw
-from pywa import __version__ as wa_version
+from pywa_async import __version__ as wa_version
 
 from data import config, clients
 from wa import handlers as wa_handlers

@@ -1,6 +1,6 @@
 import logging
 from pyrogram import Client
-from pywa import WhatsApp
+from pywa_async import WhatsApp
 from fastapi import FastAPI
 
 from data import config

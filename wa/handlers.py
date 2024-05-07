@@ -1,5 +1,5 @@
 import logging
-from pywa import types as wa_types, handlers, WhatsApp, filters, errors
+from pywa_async import types as wa_types, handlers, WhatsApp, filters, errors
 from pyrogram import types as tg_types
 from sqlalchemy.exc import NoResultFound
 
@@ -50,7 +50,7 @@ async def create_user(_: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened) 
             if not (
                 isinstance(msg, wa_types.Message) and not msg.text.startswith("/start")
             ):
-                msg.reply(text_welcome.text)
+                await msg.reply(text_welcome.text)
 
         # create user and topic
         topic = await tg_bot.create_forum_topic(

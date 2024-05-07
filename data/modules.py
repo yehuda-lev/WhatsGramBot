@@ -1,6 +1,6 @@
 import enum
 
-from pywa import types as wa_types
+from pywa_async import types as wa_types
 from dataclasses import dataclass
 
 

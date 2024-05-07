@@ -26,6 +26,7 @@ HANDLERS = [
     handlers.MessageHandler(
         tg_bot.on_command,
         filters.group
+        & filters.text
         & filters.regex(r"^/")
         & filters.chat(tg_bot.settings.tg_group_topic_id),
     ),

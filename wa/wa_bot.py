@@ -2,7 +2,7 @@ import asyncio
 import io
 import logging
 import typing
-from pywa import types as wa_types, WhatsApp
+from pywa_async import types as wa_types, WhatsApp
 from pyrogram import types as tg_types, errors
 from sqlalchemy.exc import NoResultFound
 
@@ -30,8 +30,8 @@ async def on_command_start(_: WhatsApp, msg: wa_types.Message):
         text_welcome = None
 
     if text_welcome:
-        msg.mark_as_read()
-        msg.reply(text_welcome.text)
+        await msg.mark_as_read()
+        await msg.reply(text_welcome.text)
 
 
 async def get_message(_: WhatsApp, msg: wa_types.Message):
@@ -63,7 +63,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
     while True:
         try:
             if msg.has_media:
-                download = io.BytesIO(msg.download_media(in_memory=True))
+                download = io.BytesIO(await msg.download_media(in_memory=True))  # TODO not working
                 download.name = f"{msg.type}{msg.media.extension}"
                 media_kwargs = dict(
                     **kwargs,
