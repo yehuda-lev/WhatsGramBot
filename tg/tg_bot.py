@@ -201,11 +201,10 @@ async def on_message(_: Client, msg: tg_types.Message):
                     ),
                 )
     except errors.WhatsAppError as e:
-        if e.error_code == 100:
-            await msg.reply("__Unsupported media type__", quote=True)
-        else:
-            _logger.exception(e)
-            await msg.reply(f"Error: __{e}__", quote=True)
+        _logger.exception(f"Error sending message to WhatsApp: ")
+        await msg.reply(
+            text=f"__trying to send {msg.media.name.lower()} message but the upload failed__",
+        )
 
     except httpx.ReadTimeout:
         _logger.debug("Timeout sending message to WhatsApp")
