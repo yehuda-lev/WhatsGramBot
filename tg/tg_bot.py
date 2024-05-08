@@ -266,6 +266,8 @@ async def on_message_service(_: Client, msg: tg_types.Message):
             if topic.user.banned:
                 repositoy.update_user(wa_id=topic.user.wa_id, banned=False)
                 await msg.reply("User unbanned", quote=True)
+        case _:
+            pass
 
 
 async def on_command(client: Client, msg: tg_types.Message):
@@ -278,7 +280,7 @@ async def on_command(client: Client, msg: tg_types.Message):
     except NoResultFound:
         topic = None
 
-    if msg.text.startswith("/info"):
+    if msg.text == "/info":
         if topic is None:
             await msg.reply("No topic found", quote=True)
             return
@@ -307,7 +309,7 @@ async def on_command(client: Client, msg: tg_types.Message):
             ),
         )
 
-    elif msg.text.startswith("/settings"):
+    elif msg.text in ["/settings", "/ban", "/unban"]:
         # check if the user is admin in the group
         user = await client.get_chat_member(msg.chat.id, msg.from_user.id)
         if user.status not in (
@@ -317,47 +319,72 @@ async def on_command(client: Client, msg: tg_types.Message):
             await msg.reply("You are not admin in the group", quote=True)
             return
 
-        try:
-            db_settings = repositoy.get_settings()
-            chat_opened_enable = db_settings.chat_opened_enable
-            welcome_msg = db_settings.welcome_msg
-        except NoResultFound:
-            repositoy.create_settings()
-            chat_opened_enable = False
-            welcome_msg = False
+        if msg.text == "/settings":
+            try:
+                db_settings = repositoy.get_settings()
+                chat_opened_enable = db_settings.chat_opened_enable
+                welcome_msg = db_settings.welcome_msg
+            except NoResultFound:
+                repositoy.create_settings()
+                chat_opened_enable = False
+                welcome_msg = False
 
-        await msg.reply(
-            text=f"**Settings**\n"
-            f"**Chat opened enable:** __{chat_opened_enable}__\n"
-            f"> if chat opened is active - the bot will create topic when user open chat. "
-            f"else - the bot will create topic only if user send message\n\n"
-            f"**Welcome message:** __{welcome_msg}__\n"
-            f"> if welcome message is active - the bot will send welcome message when the topic is created\n\n"
-            f"__Tap on the button to change the settings__",
-            quote=True,
-            reply_markup=tg_types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        tg_types.InlineKeyboardButton(
-                            text=f"Chat opened: {'❌' if chat_opened_enable else '✅'}",
-                            callback_data=f"settings_chat_opened_enable_{'Disable' if chat_opened_enable else 'Enable'}",
-                        ),
-                    ],
-                    [
-                        tg_types.InlineKeyboardButton(
-                            text=f"Welcome message {'❌' if welcome_msg else '✅'}",
-                            callback_data=f"settings_welcome_msg_{'Disable' if welcome_msg else 'Enable'}",
-                        ),
-                    ],
-                    [
-                        tg_types.InlineKeyboardButton(
-                            text="Change message welcome",
-                            callback_data="settings_change_msg_welcome",
-                        ),
-                    ],
-                ]
-            ),
-        )
+            await msg.reply(
+                text=f"**Settings**\n"
+                f"**Chat opened enable:** __{chat_opened_enable}__\n"
+                f"> if chat opened is active - the bot will create topic when user open chat. "
+                f"else - the bot will create topic only if user send message\n\n"
+                f"**Welcome message:** __{welcome_msg}__\n"
+                f"> if welcome message is active - the bot will send welcome message when the topic is created\n\n"
+                f"__Tap on the button to change the settings__",
+                quote=True,
+                reply_markup=tg_types.InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            tg_types.InlineKeyboardButton(
+                                text=f"Chat opened: {'❌' if chat_opened_enable else '✅'}",
+                                callback_data=f"settings_chat_opened_enable_{'Disable' if chat_opened_enable else 'Enable'}",
+                            ),
+                        ],
+                        [
+                            tg_types.InlineKeyboardButton(
+                                text=f"Welcome message {'❌' if welcome_msg else '✅'}",
+                                callback_data=f"settings_welcome_msg_{'Disable' if welcome_msg else 'Enable'}",
+                            ),
+                        ],
+                        [
+                            tg_types.InlineKeyboardButton(
+                                text="Change message welcome",
+                                callback_data="settings_change_msg_welcome",
+                            ),
+                        ],
+                    ]
+                ),
+            )
+
+        elif msg.text == "/ban":
+            if not topic:
+                await msg.reply("No topic found", quote=True)
+                return
+
+            if topic.user.banned:
+                await msg.reply("User already banned", quote=True)
+                return
+
+            repositoy.update_user(wa_id=topic.user.wa_id, banned=True)
+            await msg.reply("User banned", quote=True)
+
+        elif msg.text == "/unban":
+            if not topic:
+                await msg.reply("No topic found", quote=True)
+                return
+
+            if not topic.user.banned:
+                await msg.reply("User already unbanned", quote=True)
+                return
+
+            repositoy.update_user(wa_id=topic.user.wa_id, banned=False)
+            await msg.reply("User unbanned", quote=True)
 
 
 async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):

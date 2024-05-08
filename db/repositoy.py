@@ -76,6 +76,11 @@ def update_user(*, wa_id: str, **kwargs):
     """
 
     _logger.debug(f"update user wa_id:{wa_id}, kwargs:{kwargs}")
+    user = get_user_by_wa_id(wa_id=wa_id)
+    cache.delete(
+        cache_name="get_topic_by_topic_id",
+        cache_id=cache.build_cache_id(topic_id=user.topic.topic_id),
+    )
     cache.delete(
         cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=wa_id)
     )
@@ -97,6 +102,11 @@ def update_topic(*, topic_id: int, **kwargs):
     cache.delete(
         cache_name="get_topic_by_topic_id",
         cache_id=cache.build_cache_id(topic_id=topic_id),
+    )
+    topic = get_topic_by_topic_id(topic_id=topic_id)
+    cache.delete(
+        cache_name="get_user_by_wa_id",
+        cache_id=cache.build_cache_id(wa_id=topic.user.wa_id),
     )
 
     with get_session() as session:
