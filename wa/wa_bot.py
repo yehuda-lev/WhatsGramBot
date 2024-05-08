@@ -259,7 +259,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             _logger.debug("Timeout sending message to telegram")
             sent = await tg_bot.send_message(
                 **kwargs,
-                text=f"__The user send {msg.type} message but the download failed because timeout set to {settings.timeout_httpx} __",
+                text=f"__The user send {msg.type} message but the download failed because timeout set to {settings.httpx_timeout} __",
             )
 
         except Exception as e:  # noqa

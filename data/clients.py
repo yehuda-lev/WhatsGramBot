@@ -23,16 +23,16 @@ tg_bot = Client(
 # whatsapp
 app = FastAPI()
 
-httpx_session = httpx.AsyncClient(timeout=httpx.Timeout(timeout=settings.timeout_httpx))
+httpx_session = httpx.AsyncClient(timeout=httpx.Timeout(timeout=settings.httpx_timeout))
 wa_bot = WhatsApp(
     phone_id=settings.wa_phone_id,
     token=settings.wa_token,
     server=app,
     verify_token=settings.wa_verify_token,
-    callback_url=settings.callback_url,
-    webhook_endpoint=settings.webhook_endpoint,
-    app_id=settings.app_id,
-    app_secret=settings.app_secret,
+    callback_url=settings.wa_callback_url,
+    webhook_endpoint=settings.wa_webhook_endpoint,
+    app_id=settings.wa_app_id,
+    app_secret=settings.wa_app_secret,
     verify_timeout=10,
     session=httpx_session,
 )

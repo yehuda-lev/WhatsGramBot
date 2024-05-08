@@ -20,13 +20,14 @@ class Settings(BaseSettings):
     wa_verify_token: str
     wa_token: str
     wa_phone_number: int
-    app_id: int
-    app_secret: str
-    callback_url: str
-    port: int
-    webhook_endpoint: str
+    wa_app_id: int
+    wa_app_secret: str
+    wa_callback_url: str
+    wa_webhook_endpoint: str
 
-    timeout_httpx: float
+    port: int
+    httpx_timeout: float
+    debug: bool
 
 
 @lru_cache
