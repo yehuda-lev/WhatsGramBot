@@ -95,7 +95,8 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
         text_forwarded = f"__This message was forwarded {'many times' if msg.forwarded_many_times else ''}__"
         if not text:
             text = text_forwarded
-        text = f"{text}\n\n{text_forwarded}"
+        else:
+            text = f"{text}\n\n{text_forwarded}"
 
     while True:
         user = repositoy.get_user_by_wa_id(wa_id=wa_id)

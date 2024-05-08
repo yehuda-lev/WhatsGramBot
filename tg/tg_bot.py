@@ -245,9 +245,9 @@ async def _handle_other_message(
         sent = await wa_bot.send_message(
             **msg_kwargs,
             text=text,
-            preview_url=msg.link_preview_options.is_disabled
+            preview_url=not msg.link_preview_options.is_disabled
             if msg.link_preview_options
-            else None,
+            else False,
             reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
         )
     elif msg.location or msg.venue:
@@ -458,6 +458,8 @@ async def on_command(client: Client, msg: tg_types.Message):
                 await msg.reply("User already banned", quote=True)
                 return
 
+            await client.close_forum_topic(chat_id=msg.chat.id, message_thread_id=topic_id)
+
             repositoy.update_user(wa_id=topic.user.wa_id, banned=True)
             await msg.reply("User banned", quote=True)
 
@@ -469,6 +471,8 @@ async def on_command(client: Client, msg: tg_types.Message):
             if not topic.user.banned:
                 await msg.reply("User already unbanned", quote=True)
                 return
+
+            await client.reopen_forum_topic(chat_id=msg.chat.id, message_thread_id=topic_id)
 
             repositoy.update_user(wa_id=topic.user.wa_id, banned=False)
             await msg.reply("User unbanned", quote=True)
