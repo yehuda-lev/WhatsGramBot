@@ -217,9 +217,9 @@ async def on_message(_: Client, msg: tg_types.Message):
                     ),
                 )
     except errors.WhatsAppError as e:
-        _logger.exception(f"Error sending message to WhatsApp: ")
+        _logger.debug(f"Error sending message to WhatsApp: ", e.message)
         await msg.reply(
-            text=f"__trying to send {msg.media.name.lower()} message but the upload failed__",
+            text=f"__Failed while uploading to WhatsApp.__ \n> {e.message}",
         )
 
     except httpx.ReadTimeout:
