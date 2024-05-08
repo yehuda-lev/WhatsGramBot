@@ -90,27 +90,28 @@ def update_user(*, wa_id: str, **kwargs):
         session.commit()
 
 
-def update_topic(*, topic_id: int, **kwargs):
+def update_topic(*, tg_topic_id: int, **kwargs):
     """
     Update topic
-    :param topic_id: the id of the topic
+    :param tg_topic_id: the id of the topic
     :param kwargs: the fields to update
     :return:
     """
 
-    _logger.debug(f"update topic topic_id:{topic_id}, kwargs:{kwargs}")
-    cache.delete(
-        cache_name="get_topic_by_topic_id",
-        cache_id=cache.build_cache_id(topic_id=topic_id),
-    )
-    topic = get_topic_by_topic_id(topic_id=topic_id)
+    _logger.debug(f"update topic tg_topic_id:{tg_topic_id}, kwargs:{kwargs}")
+
+    topic = get_topic_by_topic_id(topic_id=tg_topic_id)
     cache.delete(
         cache_name="get_user_by_wa_id",
         cache_id=cache.build_cache_id(wa_id=topic.user.wa_id),
     )
+    cache.delete(
+        cache_name="get_topic_by_topic_id",
+        cache_id=cache.build_cache_id(topic_id=tg_topic_id),
+    )
 
     with get_session() as session:
-        session.query(Topic).filter(Topic.topic_id == topic_id).update(kwargs)
+        session.query(Topic).filter(Topic.topic_id == tg_topic_id).update(kwargs)
         session.commit()
 
 

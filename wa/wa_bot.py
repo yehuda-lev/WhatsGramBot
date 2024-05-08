@@ -36,23 +36,6 @@ async def on_command_start(_: WhatsApp, msg: wa_types.Message):
 
 async def get_message(_: WhatsApp, msg: wa_types.Message):
     wa_id = msg.sender
-    user = repositoy.get_user_by_wa_id(wa_id=wa_id)
-    topic_id = user.topic.topic_id
-    sent = None
-    reply_msg = None
-    if msg.is_reply:
-        try:
-            reply_to = msg.reply_to_message.message_id
-            reply_msg = repositoy.get_message(wa_msg_id=reply_to, topic_msg_id=None)
-        except NoResultFound:
-            pass
-
-    kwargs = dict(
-        chat_id=send_to,
-        reply_parameters=tg_types.ReplyParameters(
-            message_id=reply_msg.topic_msg_id if reply_msg else topic_id
-        ),
-    )
 
     text = (
         utils.get_wa_text_to_tg(msg.text or msg.caption)
@@ -61,6 +44,24 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
     )
 
     while True:
+        user = repositoy.get_user_by_wa_id(wa_id=wa_id)
+        topic_id = user.topic.topic_id
+        sent = None
+        reply_msg = None
+        if msg.is_reply:
+            try:
+                reply_to = msg.message_id_to_reply
+                reply_msg = repositoy.get_message(wa_msg_id=reply_to, topic_msg_id=None)
+            except NoResultFound:
+                pass
+
+        kwargs = dict(
+            chat_id=send_to,
+            reply_parameters=tg_types.ReplyParameters(
+                message_id=reply_msg.topic_msg_id if reply_msg else topic_id
+            ),
+        )
+
         try:
             if msg.has_media:
                 download = io.BytesIO(await msg.download_media(in_memory=True))
@@ -168,8 +169,27 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
         except errors.ReactionEmpty:
             pass
 
-        except Exception as e:
-            _logger.exception(e)
+        except errors.TopicDeleted:
+            # create new topic
+            _logger.debug("his topic was deleted, creating new topic..")
+            try:
+                topic = await tg_bot.create_forum_topic(
+                    chat_id=settings.tg_group_topic_id,
+                    name=f"{user.name} | {wa_id}",
+                )
+                new_topic_id = topic.id
+                repositoy.update_topic(tg_topic_id=topic_id, topic_id=new_topic_id)
+            except Exception:  # noqa
+                _logger.exception(
+                    "Error creating topic: ",
+                )
+                return
+            continue
+
+        except Exception as e:  # noqa
+            _logger.exception(
+                "Error sending message: ",
+            )
 
         if sent:
             repositoy.create_message(
