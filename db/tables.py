@@ -79,6 +79,7 @@ class Message(BaseTable):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     topic_msg_id: Mapped[int] = mapped_column(unique=True)
     wa_msg_id: Mapped[str] = mapped_column(unique=True)
+    sent_from_tg: Mapped[bool]
     created_at: Mapped[datetime.datetime]
 
     topic_id: Mapped[int] = mapped_column(ForeignKey("topic.id"))
@@ -104,8 +105,9 @@ class Settings(BaseTable):
     __tablename__ = "settings"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    chat_opened_enable: Mapped[bool] = mapped_column(default=False)
-    welcome_msg: Mapped[bool] = mapped_column(default=False)
+    wa_chat_opened_enable: Mapped[bool] = mapped_column(default=False)
+    wa_welcome_msg: Mapped[bool] = mapped_column(default=False)
+    wa_mark_as_read: Mapped[bool] = mapped_column(default=False)
 
 
 BaseTable.metadata.create_all(engine)

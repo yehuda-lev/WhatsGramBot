@@ -218,7 +218,11 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
 
         if sent:
             repositoy.create_message(
-                wa_id=wa_id, topic_id=topic_id, wa_msg_id=msg.id, topic_msg_id=sent.id
+                wa_id=wa_id,
+                topic_id=topic_id,
+                wa_msg_id=msg.id,
+                topic_msg_id=sent.id,
+                sent_from_tg=False,
             )
         break
 

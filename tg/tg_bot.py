@@ -207,11 +207,28 @@ async def on_message(_: Client, msg: tg_types.Message):
             await msg.reply(f"Error: __{e}__", quote=True)
 
     if sent:
+        # read the last message the wa user sent
+        try:
+            db_settings = repositoy.get_settings()
+            mark_as_read = db_settings.wa_mark_as_read
+            if mark_as_read:
+                message_to_read = repositoy.get_last_message(wa_id=wa_id)
+                if (
+                    not message_to_read.sent_from_tg
+                ):  # the last message to read is from whatsapp
+                    await wa_bot.mark_message_as_read(
+                        message_id=message_to_read.wa_msg_id
+                    )
+        except NoResultFound:
+            pass
+
+        # create the new message
         repositoy.create_message(
             topic_id=topic_id,
             topic_msg_id=msg.id,
             wa_msg_id=sent,
             wa_id=wa_id,
+            sent_from_tg=True,
         )
 
 
@@ -326,12 +343,14 @@ async def on_command(client: Client, msg: tg_types.Message):
         if msg.text == "/settings":
             try:
                 db_settings = repositoy.get_settings()
-                chat_opened_enable = db_settings.chat_opened_enable
-                welcome_msg = db_settings.welcome_msg
+                chat_opened_enable = db_settings.wa_chat_opened_enable
+                welcome_msg = db_settings.wa_welcome_msg
+                mark_as_read = db_settings.wa_mark_as_read
             except NoResultFound:
                 repositoy.create_settings()
                 chat_opened_enable = False
                 welcome_msg = False
+                mark_as_read = False
 
             await msg.reply(
                 text=f"**Settings**\n"
@@ -340,20 +359,29 @@ async def on_command(client: Client, msg: tg_types.Message):
                 f"else - the bot will create topic only if user send message\n\n"
                 f"**Welcome message:** __{welcome_msg}__\n"
                 f"> if welcome message is active - the bot will send welcome message when the topic is created\n\n"
+                f"**Mark as read:** __{mark_as_read}__\n"
+                f"> if mark as read is active - the bot will mark the message as read "
+                f"when you reply to the message in the topic\n\n"
                 f"__Tap on the button to change the settings__",
                 quote=True,
                 reply_markup=tg_types.InlineKeyboardMarkup(
                     inline_keyboard=[
                         [
                             tg_types.InlineKeyboardButton(
-                                text=f"Chat opened: {'❌' if chat_opened_enable else '✅'}",
+                                text=f"Chat opened: {'disable ❌' if chat_opened_enable else 'enable ✅'}",
                                 callback_data=f"settings_chat_opened_enable_{'Disable' if chat_opened_enable else 'Enable'}",
                             ),
                         ],
                         [
                             tg_types.InlineKeyboardButton(
-                                text=f"Welcome message {'❌' if welcome_msg else '✅'}",
+                                text=f"Welcome message {'disable ❌' if welcome_msg else 'enable ✅'}",
                                 callback_data=f"settings_welcome_msg_{'Disable' if welcome_msg else 'Enable'}",
+                            ),
+                        ],
+                        [
+                            tg_types.InlineKeyboardButton(
+                                text=f"Mark as read {'disable ❌' if mark_as_read else 'enable ✅'}",
+                                callback_data=f"settings_mark_as_read_{'Disable' if mark_as_read else 'Enable'}",
                             ),
                         ],
                         [
@@ -397,14 +425,13 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
     if cbd_data.startswith("settings"):
         if cbd_data.startswith("settings_chat_opened_enable"):
             chat_opened_enable = cbd_data.split("_")[-1].lower() == "enable"
-            repositoy.update_settings(chat_opened_enable=chat_opened_enable)
+            repositoy.update_settings(wa_chat_opened_enable=chat_opened_enable)
 
             # update the chat_opened in the bot on WhatsApp
-            await wa_bot.update_conversational_automation(
-                enable_chat_opened=chat_opened_enable,
-                ice_breakers=None,
-                commands=[wa_types.Command("start", "start")],
-            )
+            if chat_opened_enable:
+                await wa_bot.update_conversational_automation(
+                    enable_chat_opened=chat_opened_enable,
+                )
 
             await cbd.message.edit_text(
                 f"Chat opened is {'enabled' if chat_opened_enable else 'disabled'} now"
@@ -412,9 +439,16 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
 
         elif cbd_data.startswith("settings_welcome_msg"):
             welcome_msg = cbd_data.split("_")[-1].lower() == "enable"
-            repositoy.update_settings(welcome_msg=welcome_msg)
+            repositoy.update_settings(wa_welcome_msg=welcome_msg)
             await cbd.message.edit_text(
                 f"Welcome message is {'enabled' if welcome_msg else 'disabled'} now"
+            )
+
+        elif cbd_data.startswith("settings_mark_as_read"):
+            mark_as_read = cbd_data.split("_")[-1].lower() == "enable"
+            repositoy.update_settings(wa_mark_as_read=mark_as_read)
+            await cbd.message.edit_text(
+                f"Mark as read is {'enabled' if mark_as_read else 'disabled'} now"
             )
 
         elif cbd_data.startswith("settings_change_msg_welcome"):

@@ -24,10 +24,10 @@ async def create_user(_: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened) 
         if user.banned:
             return False
     except NoResultFound:  # if user not exists than create user
-        try:  # get if chat_opened_enable and if welcome_msg
+        try:  # get if wa_chat_opened_enable and if wa_welcome_msg
             db_settings = repositoy.get_settings()
-            chat_opened_enable = db_settings.chat_opened_enable
-            welcome_msg = db_settings.welcome_msg
+            chat_opened_enable = db_settings.wa_chat_opened_enable
+            welcome_msg = db_settings.wa_welcome_msg
         except NoResultFound:
             repositoy.create_settings()
             chat_opened_enable = False

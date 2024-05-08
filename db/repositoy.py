@@ -118,17 +118,20 @@ def update_topic(*, tg_topic_id: int, **kwargs):
 # message
 
 
-def create_message(*, wa_id: str, topic_id: int, wa_msg_id: str, topic_msg_id: int):
+def create_message(
+    *, wa_id: str, topic_id: int, wa_msg_id: str, topic_msg_id: int, sent_from_tg: bool
+):
     """
     Create message
     :param wa_id: the number of the user
     :param topic_id: the id of the topic
     :param wa_msg_id: the id of the message in whatsapp
     :param topic_msg_id: the id of the message in topic
+    :param sent_from_tg: true if the message was sent from telegram
     :return:
     """
     _logger.debug(
-        f"create message wa_id:{wa_id}, topic_id:{topic_id}, wa_msg_id:{wa_msg_id}, topic_msg_id:{topic_msg_id}"
+        f"create message wa_id:{wa_id}, topic_id:{topic_id}, wa_msg_id:{wa_msg_id}, topic_msg_id:{topic_msg_id}, sent_from_tg:{sent_from_tg}"
     )
     with get_session() as session:
         user = session.query(WaUser).filter(WaUser.wa_id == wa_id).one()
@@ -138,6 +141,7 @@ def create_message(*, wa_id: str, topic_id: int, wa_msg_id: str, topic_msg_id: i
             topic_msg_id=topic_msg_id,
             topic=topic,
             user=user,
+            sent_from_tg=sent_from_tg,
             created_at=datetime.datetime.now(),
         )
 
@@ -161,6 +165,22 @@ def get_message(*, topic_msg_id: int | None, wa_msg_id: str | None) -> Message:
                 .one()
             )
         return session.query(Message).filter(Message.wa_msg_id == wa_msg_id).one()
+
+
+def get_last_message(*, wa_id: str) -> Message:
+    """
+    Get last message by wa_id
+    :param wa_id: the number of the user
+    :return: the last message
+    """
+    with get_session() as session:
+        user = get_user_by_wa_id(wa_id=wa_id)
+        return (
+            session.query(Message)
+            .filter(Message.user == user)
+            .order_by(Message.created_at.desc())
+            .first()
+        )
 
 
 # message to send
@@ -230,23 +250,30 @@ def update_message_to_send(*, type_event: str, **kwargs):
 # settings
 
 
-def create_settings(*, chat_opened_enable: bool = False, welcome_msg: bool = False):
+def create_settings(
+    *,
+    chat_opened_enable: bool = False,
+    welcome_msg: bool = False,
+    mark_as_read: bool = False,
+):
     """
     Create settings
     :param chat_opened_enable: the status of the chat
     :param welcome_msg: the status of the welcome message
+    :param mark_as_read: the status of the mark as read
     :return:
     """
 
     _logger.debug(
-        f"create settings, chat_opened_enable:{chat_opened_enable}, welcome_msg:{welcome_msg}"
+        f"create settings, wa_chat_opened_enable:{chat_opened_enable}, wa_welcome_msg:{welcome_msg}, wa_mark_as_read:{mark_as_read}"
     )
     cache.delete(cache_name="get_settings")
 
     with get_session() as session:
         settings = Settings(
-            chat_opened_enable=chat_opened_enable,
-            welcome_msg=welcome_msg,
+            wa_chat_opened_enable=chat_opened_enable,
+            wa_welcome_msg=welcome_msg,
+            wa_mark_as_read=mark_as_read,
         )
 
         session.add(settings)
