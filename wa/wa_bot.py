@@ -18,7 +18,9 @@ settings = config.get_settings()
 send_to = settings.tg_group_topic_id
 
 
-def check_if_update_in_process(func: typing.Callable[[WhatsApp, typing.Any], typing.Awaitable[typing.Any]]):
+def check_if_update_in_process(
+    func: typing.Callable[[WhatsApp, typing.Any], typing.Awaitable[typing.Any]],
+):
     updates_in_process: set[str]() = set()
 
     @functools.wraps(func)
@@ -81,7 +83,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
         return
     except NoResultFound:
         pass
-    
+
     wa_id = msg.sender
 
     text = (
@@ -243,11 +245,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             # create new topic
             _logger.debug("his topic was deleted, creating new topic..")
             try:
-                topic = await tg_bot.create_forum_topic(
-                    chat_id=settings.tg_group_topic_id,
-                    name=f"{user.name} | {wa_id}",
-                )
-                new_topic_id = topic.id
+                new_topic_id = await utils.create_topic(tg_bot, wa_id, user.name)
                 repositoy.update_topic(tg_topic_id=topic_id, topic_id=new_topic_id)
             except Exception:  # noqa
                 _logger.exception(

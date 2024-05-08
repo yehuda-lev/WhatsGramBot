@@ -1,11 +1,10 @@
 import logging
-from pywa_async import types as wa_types, handlers, WhatsApp, filters, errors
-from pyrogram import types as tg_types
+from pywa_async import types as wa_types, handlers, WhatsApp, filters
 from sqlalchemy.exc import NoResultFound
 
 from wa import wa_bot
 from db import repositoy
-from data import clients, config, modules
+from data import clients, config, modules, utils
 
 _logger = logging.getLogger(__name__)
 settings = config.get_settings()
@@ -53,33 +52,12 @@ async def create_user(_: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened) 
                 await msg.reply(text_welcome.text)
 
         # create user and topic
-        topic = await tg_bot.create_forum_topic(
-            chat_id=settings.tg_group_topic_id,
-            name=f"{name} | {wa_id}",
-        )
-        topic_id = topic.id
+        topic_id = await utils.create_topic(tg_bot, wa_id, name)
         repositoy.create_user_and_topic(
             wa_id=wa_id,
             name=name,
             topic_id=topic_id,
         )
-
-        sent = await tg_bot.send_message(
-            chat_id=settings.tg_group_topic_id,
-            text=f"User {name} | {wa_id} created topic {topic.id}",
-            reply_parameters=tg_types.ReplyParameters(message_id=topic.id),
-            reply_markup=tg_types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        tg_types.InlineKeyboardButton(
-                            text="WhatsApp", url=f"https://wa.me/{wa_id}"
-                        )
-                    ],
-                ],
-            ),
-        )
-        await sent.pin(disable_notification=True)
-
     return True
 
 

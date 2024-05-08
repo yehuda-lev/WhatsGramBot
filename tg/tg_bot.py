@@ -1,10 +1,11 @@
 import logging
 import mimetypes
+import typing
 
 import httpx
 from pyrogram import types as tg_types, Client, enums
-from pywa_async import types as wa_types, errors
-from sqlalchemy.exc import NoResultFound
+from pywa_async import types as wa_types, errors as wa_errors
+from sqlalchemy import exc as sqlalchemy_errors
 
 from data import clients, config, modules, utils
 from db import repositoy
@@ -32,7 +33,7 @@ async def on_message(_: Client, msg: tg_types.Message):
     )
     try:
         topic = repositoy.get_topic_by_topic_id(topic_id=topic_id)
-    except NoResultFound:
+    except sqlalchemy_errors.NoResultFound:
         return
 
     if topic.user.banned:
@@ -43,7 +44,7 @@ async def on_message(_: Client, msg: tg_types.Message):
         reply_to = msg.reply_to_message_id
         try:
             reply_msg = repositoy.get_message(topic_msg_id=reply_to, wa_msg_id=None)
-        except NoResultFound:
+        except sqlalchemy_errors.NoResultFound:
             pass
 
     wa_id = topic.user.wa_id
@@ -84,139 +85,23 @@ async def on_message(_: Client, msg: tg_types.Message):
                 return
 
             download = await msg.download(in_memory=True)
-            media_kwargs = dict(
-                **kwargs,
-                reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
-                caption=text,
+
+            sent = await _handle_media_message(
+                msg=msg,
+                reply_msg=reply_msg,
+                text=text,
+                download=typing.cast(bytes, download),
+                msg_kwargs=kwargs,
             )
-
-            match msg.media:
-                case enums.MessageMediaType.PHOTO:
-                    sent = await wa_bot.send_image(
-                        **media_kwargs, image=download, mime_type="image/jpeg"
-                    )
-
-                case enums.MessageMediaType.VIDEO:
-                    sent = await wa_bot.send_video(
-                        **media_kwargs,
-                        video=download,
-                        mime_type=msg.video.mime_type or "video/mp4",
-                    )
-
-                case enums.MessageMediaType.STORY:
-                    if msg.story.video:
-                        sent = await wa_bot.send_video(
-                            **media_kwargs,
-                            video=download,
-                            mime_type=media.mime_type or "video/mp4",
-                        )
-                    elif msg.story.photo:
-                        sent = await wa_bot.send_image(
-                            **media_kwargs, photo=download, mime_type="image/jpeg"
-                        )
-                    else:
-                        await msg.reply("__Unsupported story type__", quote=True)
-                        _logger.warning(f"Unsupported story type: {msg.story}")
-                        return
-
-                case enums.MessageMediaType.ANIMATION:
-                    sent = await wa_bot.send_video(
-                        **media_kwargs,
-                        video=download,
-                        mime_type=media.mime_type or "video/mp4",
-                    )
-
-                case enums.MessageMediaType.VIDEO_NOTE:
-                    sent = await wa_bot.send_video(
-                        **media_kwargs,
-                        video=download,
-                        mime_type=media.mime_type or "video/mp4",
-                    )
-
-                case enums.MessageMediaType.DOCUMENT:
-                    sent = await wa_bot.send_document(
-                        **media_kwargs,
-                        document=download,
-                        filename=media.file_name,
-                        mime_type=media.mime_type
-                        or mimetypes.guess_type(media.file_name)[0]
-                        or "application/octet-stream",
-                    )
-
-                # with no caption
-                case enums.MessageMediaType.AUDIO:
-                    sent = await wa_bot.send_audio(
-                        **kwargs,
-                        audio=download,
-                        mime_type=media.mime_type or "audio/mpeg",
-                    )
-                case enums.MessageMediaType.VOICE:
-                    sent = await wa_bot.send_audio(
-                        **kwargs,
-                        audio=download,
-                        mime_type=media.mime_type or "audio/ogg",
-                    )
-                case enums.MessageMediaType.STICKER:
-                    if media.is_animated:
-                        await msg.reply(
-                            "__Animated stickers are not supported__", quote=True
-                        )
-                        return
-
-                    sent = await wa_bot.send_sticker(
-                        **kwargs,
-                        sticker=download,
-                        mime_type=media.mime_type or "image/webp",
-                    )
-                case _:
-                    return
+            if not sent:
+                return
 
         else:
-            if msg.text:
-                sent = await wa_bot.send_message(
-                    **kwargs,
-                    text=text,
-                    preview_url=msg.link_preview_options.is_disabled
-                    if msg.link_preview_options
-                    else None,
-                    reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
-                )
-            elif msg.location or msg.venue:
-                sent = await wa_bot.send_location(
-                    **kwargs,
-                    latitude=msg.location.latitude
-                    if msg.location
-                    else msg.venue.location.latitude,
-                    longitude=msg.location.longitude
-                    if msg.location
-                    else msg.venue.location.longitude,
-                    name=msg.venue.title if msg.venue else None,
-                    address=msg.venue.address if msg.venue else None,
-                )
-            elif msg.contact:
-                sent = await wa_bot.send_contact(
-                    **kwargs,
-                    reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
-                    contact=wa_types.Contact(
-                        name=wa_types.Contact.Name(
-                            formatted_name=msg.contact.first_name
-                            + (
-                                (" " + msg.contact.last_name)
-                                if msg.contact.last_name
-                                else ""
-                            ),
-                            first_name=msg.contact.first_name,
-                            last_name=msg.contact.last_name,
-                        ),
-                        phones=[
-                            wa_types.Contact.Phone(
-                                phone=msg.contact.phone_number,
-                                wa_id=msg.contact.phone_number.replace("+", ""),
-                            )
-                        ],
-                    ),
-                )
-    except errors.WhatsAppError as e:
+            sent = _handle_other_message(
+                msg=msg, reply_msg=reply_msg, text=text, msg_kwargs=kwargs
+            )
+
+    except wa_errors.WhatsAppError as e:
         _logger.debug(f"Error sending message to WhatsApp: {e.message}")
         await msg.reply(
             text=f"__Failed to send to WhatsApp.__\n> **{e.message}**\n> {e.details}",
@@ -242,7 +127,7 @@ async def on_message(_: Client, msg: tg_types.Message):
                     await wa_bot.mark_message_as_read(
                         message_id=message_to_read.wa_msg_id
                     )
-        except NoResultFound:
+        except (sqlalchemy_errors.NoResultFound, wa_errors.WhatsAppError):
             pass
 
         # create the new message
@@ -253,6 +138,150 @@ async def on_message(_: Client, msg: tg_types.Message):
             wa_id=wa_id,
             sent_from_tg=True,
         )
+
+
+async def _handle_media_message(
+    msg: tg_types.Message,
+    reply_msg: repositoy.Message,
+    text: str | None,
+    download: bytes,
+    msg_kwargs: dict,
+) -> str | None:
+    media_kwargs = dict(
+        **msg_kwargs,
+        reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
+        caption=text,
+    )
+    match msg.media:
+        case enums.MessageMediaType.PHOTO:
+            sent = await wa_bot.send_image(
+                **media_kwargs, image=download, mime_type="image/jpeg"
+            )
+
+        case enums.MessageMediaType.VIDEO:
+            sent = await wa_bot.send_video(
+                **media_kwargs,
+                video=download,
+                mime_type=msg.video.mime_type or "video/mp4",
+            )
+
+        case enums.MessageMediaType.STORY:
+            if msg.story.video:
+                sent = await wa_bot.send_video(
+                    **media_kwargs,
+                    video=download,
+                    mime_type=msg.story.video.mime_type or "video/mp4",
+                )
+            elif msg.story.photo:
+                sent = await wa_bot.send_image(
+                    **media_kwargs, photo=download, mime_type="image/jpeg"
+                )
+            else:
+                await msg.reply("__Unsupported story type__", quote=True)
+                _logger.warning(f"Unsupported story type: {msg.story}")
+                return
+
+        case enums.MessageMediaType.ANIMATION:
+            sent = await wa_bot.send_video(
+                **media_kwargs,
+                video=download,
+                mime_type=msg.animation.mime_type or "video/mp4",
+            )
+
+        case enums.MessageMediaType.VIDEO_NOTE:
+            sent = await wa_bot.send_video(
+                **media_kwargs,
+                video=download,
+                mime_type=msg.video_note.mime_type or "video/mp4",
+            )
+
+        case enums.MessageMediaType.DOCUMENT:
+            sent = await wa_bot.send_document(
+                **media_kwargs,
+                document=download,
+                filename=msg.document.file_name,
+                mime_type=msg.document.mime_type
+                or mimetypes.guess_type(msg.document.file_name)[0]
+                or "application/octet-stream",
+            )
+
+        # with no caption
+        case enums.MessageMediaType.AUDIO:
+            sent = await wa_bot.send_audio(
+                **msg_kwargs,
+                audio=download,
+                mime_type=msg.audio.mime_type or "audio/mpeg",
+            )
+        case enums.MessageMediaType.VOICE:
+            sent = await wa_bot.send_audio(
+                **msg_kwargs,
+                audio=download,
+                mime_type=msg.voice.mime_type or "audio/ogg",
+            )
+        case enums.MessageMediaType.STICKER:
+            if msg.sticker.is_animated:
+                await msg.reply("__Animated stickers are not supported__", quote=True)
+                return
+
+            sent = await wa_bot.send_sticker(
+                **msg_kwargs,
+                sticker=download,
+                mime_type=msg.sticker.mime_type or "image/webp",
+            )
+        case _:
+            return None
+
+    return sent
+
+
+async def _handle_other_message(
+    msg: tg_types.Message,
+    reply_msg: repositoy.Message,
+    text: str | None,
+    msg_kwargs: dict,
+) -> str | None:
+    sent = None
+    if msg.text:
+        sent = await wa_bot.send_message(
+            **msg_kwargs,
+            text=text,
+            preview_url=msg.link_preview_options.is_disabled
+            if msg.link_preview_options
+            else None,
+            reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
+        )
+    elif msg.location or msg.venue:
+        sent = await wa_bot.send_location(
+            **msg_kwargs,
+            latitude=msg.location.latitude
+            if msg.location
+            else msg.venue.location.latitude,
+            longitude=msg.location.longitude
+            if msg.location
+            else msg.venue.location.longitude,
+            name=msg.venue.title if msg.venue else None,
+            address=msg.venue.address if msg.venue else None,
+        )
+    elif msg.contact:
+        sent = await wa_bot.send_contact(
+            **msg_kwargs,
+            reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
+            contact=wa_types.Contact(
+                name=wa_types.Contact.Name(
+                    formatted_name=msg.contact.first_name
+                    + ((" " + msg.contact.last_name) if msg.contact.last_name else ""),
+                    first_name=msg.contact.first_name,
+                    last_name=msg.contact.last_name,
+                ),
+                phones=[
+                    wa_types.Contact.Phone(
+                        phone=msg.contact.phone_number,
+                        wa_id=msg.contact.phone_number.replace("+", ""),
+                    )
+                ],
+            ),
+        )
+    return sent
 
 
 async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
@@ -268,7 +297,7 @@ async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
                     chat_id=reaction.chat.id, msg_id=reaction.message_id
                 ),
             )
-        except NoResultFound:
+        except sqlalchemy_errors.NoResultFound:
             return
     else:
         if not reaction.new_reaction[-1].emoji:
@@ -286,7 +315,7 @@ async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
                     chat_id=reaction.chat.id, msg_id=reaction.message_id
                 ),
             )
-        except NoResultFound:
+        except sqlalchemy_errors.NoResultFound:
             return
 
 
@@ -297,7 +326,7 @@ async def on_message_service(_: Client, msg: tg_types.Message):
 
     try:
         topic = repositoy.get_topic_by_topic_id(topic_id=topic_id)
-    except NoResultFound:
+    except sqlalchemy_errors.NoResultFound:
         return
 
     match msg.service:
@@ -321,7 +350,7 @@ async def on_command(client: Client, msg: tg_types.Message):
 
     try:
         topic = repositoy.get_topic_by_topic_id(topic_id=topic_id)
-    except NoResultFound:
+    except sqlalchemy_errors.NoResultFound:
         topic = None
 
     if msg.text == "/info":
@@ -369,7 +398,7 @@ async def on_command(client: Client, msg: tg_types.Message):
                 chat_opened_enable = db_settings.wa_chat_opened_enable
                 welcome_msg = db_settings.wa_welcome_msg
                 mark_as_read = db_settings.wa_mark_as_read
-            except NoResultFound:
+            except sqlalchemy_errors.NoResultFound:
                 repositoy.create_settings()
                 chat_opened_enable = False
                 welcome_msg = False
@@ -483,7 +512,7 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
                 message_to_send = repositoy.get_message_to_send(
                     type_event=modules.EventType.MSG_WELCOME
                 )
-            except NoResultFound:
+            except sqlalchemy_errors.NoResultFound:
                 await cbd.answer("No welcome message found")
 
             if message_to_send:  # send the message tht exist
@@ -531,7 +560,7 @@ async def on_listen(_: Client, msg: tg_types.Message):
             repositoy.update_message_to_send(
                 type_event=modules.EventType.MSG_WELCOME, text=text
             )
-        except NoResultFound:
+        except sqlalchemy_errors.NoResultFound:
             repositoy.create_message_to_send(
                 type_event=modules.EventType.MSG_WELCOME, text=text
             )

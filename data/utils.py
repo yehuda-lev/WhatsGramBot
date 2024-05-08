@@ -1,5 +1,11 @@
 import re
 
+from pyrogram import types as tg_types, Client
+
+from data import config
+
+settings = config.get_settings()
+
 
 def get_tg_text_to_wa(text: str) -> str:
     """Convert Telegram text formatting to WhatsApp text formatting.
@@ -53,6 +59,31 @@ def get_wa_text_to_tg(text: str) -> str:
     text = re.sub(whatsapp_strikethrough, r"~~\1~~", text)
 
     return text
+
+
+async def create_topic(tg_bot: Client, wa_id: str, name: str) -> int:
+    topic = await tg_bot.create_forum_topic(
+        chat_id=settings.tg_group_topic_id,
+        name=f"{name} | {wa_id}",
+    )
+
+    sent = await tg_bot.send_message(
+        chat_id=settings.tg_group_topic_id,
+        text=f"User {name} | {wa_id} created topic {topic.id}",
+        reply_parameters=tg_types.ReplyParameters(message_id=topic.id),
+        reply_markup=tg_types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    tg_types.InlineKeyboardButton(
+                        text="WhatsApp", url=f"https://wa.me/{wa_id}"
+                    )
+                ],
+            ],
+        ),
+    )
+    await sent.pin(disable_notification=True)
+
+    return topic.id
 
 
 # listener
