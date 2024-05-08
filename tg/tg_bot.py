@@ -14,6 +14,17 @@ _logger = logging.getLogger(__name__)
 wa_bot = clients.wa_bot
 settings = config.get_settings()
 
+media_kb_limit = {
+    enums.MessageMediaType.PHOTO: 5 * 1024,
+    enums.MessageMediaType.VIDEO: 16 * 1024,
+    enums.MessageMediaType.ANIMATION: 16 * 1024,
+    enums.MessageMediaType.VIDEO_NOTE: 16 * 1024,
+    enums.MessageMediaType.DOCUMENT: 100 * 1024,
+    enums.MessageMediaType.AUDIO: 16 * 1024,
+    enums.MessageMediaType.VOICE: 16 * 1024,
+    enums.MessageMediaType.STICKER: 100,
+}  # https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media#supported-media-types
+
 
 async def on_message(_: Client, msg: tg_types.Message):
     topic_id = (
@@ -58,11 +69,16 @@ async def on_message(_: Client, msg: tg_types.Message):
             enums.MessageMediaType.STICKER,
             enums.MessageMediaType.STORY,
         ):
-            # check if media is more than 20MB
+            # check if media is more than limit MB
             media = getattr(msg, msg.media.name.lower())
-            if (media.file_size or 0) > (20 * 1024 * 1024):
+            media_size_kb = (
+                media_kb_limit[msg.media]
+                if not msg.media == enums.MessageMediaType.STORY
+                else media_kb_limit.get(media.media, 0)
+            )
+            if (media.file_size or 0) > (media_size_kb * 1024):
                 await msg.reply(
-                    "__Media size is more than 20MB, can't send it to WhatsApp__",
+                    f"__{msg.media.name.title()} size is more than {media_size_kb / 1024} MB, can't send it to WhatsApp__",
                     quote=True,
                 )
                 return
@@ -210,7 +226,7 @@ async def on_message(_: Client, msg: tg_types.Message):
         _logger.debug("Timeout sending message to WhatsApp")
         await msg.reply(
             text=f"__trying to send {msg.media.name.lower()} message "
-                 f"but the download failed because timeout set to {settings.timeout_httpx} __",
+            f"but the download failed because timeout set to {settings.timeout_httpx} __",
         )
 
     if sent:
