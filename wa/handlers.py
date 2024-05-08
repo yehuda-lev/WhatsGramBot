@@ -52,7 +52,7 @@ async def create_user(_: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened) 
                 await msg.reply(text_welcome.text)
 
         # create user and topic
-        topic_id = await utils.create_topic(tg_bot, wa_id, name)
+        topic_id = await utils.create_topic(tg_bot, wa_id, name, is_new=True)
         repositoy.create_user_and_topic(
             wa_id=wa_id,
             name=name,
