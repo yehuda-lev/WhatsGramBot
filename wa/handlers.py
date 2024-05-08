@@ -83,21 +83,6 @@ async def create_user(_: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened) 
     return True
 
 
-async def on_failed_status(
-    _: WhatsApp,
-    status: wa_types.MessageStatus,  # TODO [modules.Tracker]
-):
-    await tg_bot.send_message(
-        chat_id=status.tracker.chat_id,
-        text=f"__{status.error.details}__",
-        reply_parameters=tg_types.ReplyParameters(message_id=status.tracker.msg_id),
-    )
-    if isinstance(status.error, errors.ReEngagementMessage):  # 24 hours passed
-        repositoy.update_user(wa_id=status.sender, active=False)
-    else:
-        _logger.error(status.error)
-
-
 HANDLERS = [
     handlers.ChatOpenedHandler(
         wa_bot.get_chat_opened,
@@ -114,7 +99,7 @@ HANDLERS = [
         create_user,
     ),
     handlers.MessageStatusHandler(
-        on_failed_status,
+        wa_bot.on_failed_status,
         filters.message_status.failed,
         factory=modules.Tracker,
     ),

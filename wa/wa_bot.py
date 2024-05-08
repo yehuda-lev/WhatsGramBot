@@ -1,10 +1,11 @@
 import asyncio
+import functools
 import io
 import logging
 import typing
 import httpx
-from pywa_async import types as wa_types, WhatsApp
-from pyrogram import types as tg_types, errors
+from pywa_async import types as wa_types, errors as wa_errors, WhatsApp
+from pyrogram import types as tg_types, errors as tg_errors
 from sqlalchemy.exc import NoResultFound
 
 from data import clients, config, utils, modules
@@ -17,10 +18,48 @@ settings = config.get_settings()
 send_to = settings.tg_group_topic_id
 
 
+def check_if_update_in_process(func: typing.Callable[[WhatsApp, typing.Any], typing.Awaitable[typing.Any]]):
+    updates_in_process: set[str]() = set()
+
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        update = args[1]
+        if update.id in updates_in_process:
+            txt = f"Your function {func.__name__} is too slow, {update.__class__.__name__} (%s) is already in process"
+            _logger.warning(txt, update.id)
+            _logger.debug(txt, update)
+            return
+        updates_in_process.add(update.id)
+        try:
+            return await func(*args, **kwargs)
+        finally:
+            updates_in_process.remove(update.id)
+
+    return wrapper
+
+
+@check_if_update_in_process
 async def get_chat_opened(_: WhatsApp, __: wa_types.ChatOpened):
     pass
 
 
+@check_if_update_in_process
+async def on_failed_status(
+    _: WhatsApp,
+    status: wa_types.MessageStatus,  # TODO [modules.Tracker]
+):
+    await tg_bot.send_message(
+        chat_id=status.tracker.chat_id,
+        text=f"__Failed to send to WhatsApp.__\n> **{status.error.message}**\n> {status.error.details}",
+        reply_parameters=tg_types.ReplyParameters(message_id=status.tracker.msg_id),
+    )
+    if isinstance(status.error, wa_errors.ReEngagementMessage):  # 24 hours passed
+        repositoy.update_user(wa_id=status.sender, active=False)
+    else:
+        _logger.error(status.error)
+
+
+@check_if_update_in_process
 async def on_command_start(_: WhatsApp, msg: wa_types.Message):
     # get text welcome message
     try:
@@ -35,7 +74,14 @@ async def on_command_start(_: WhatsApp, msg: wa_types.Message):
         await msg.reply(text_welcome.text)
 
 
+@check_if_update_in_process
 async def get_message(_: WhatsApp, msg: wa_types.Message):
+    try:
+        repositoy.get_message(wa_msg_id=msg.id, topic_msg_id=None)
+        return
+    except NoResultFound:
+        pass
+    
     wa_id = msg.sender
 
     text = (
@@ -115,12 +161,11 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                             sticker=download,
                         )
                     case _:
-                        await tg_bot.send_message(
+                        sent = await tg_bot.send_message(
                             **kwargs,
-                            text=f"__Unsupported media type: {msg.type}__",
+                            text=f"__User sent an unsupported media type {msg.type}__",
                         )
                         _logger.warning(f"Unsupported media type: {msg.type}")
-                        return
 
             else:
                 match msg.type:
@@ -175,27 +220,26 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                                 )
 
                     case wa_types.MessageType.UNSUPPORTED:
-                        await tg_bot.send_message(
+                        sent = await tg_bot.send_message(
                             **kwargs,
                             text="__User sent an unsupported message__",
                         )
 
                     case _:
-                        await tg_bot.send_message(
+                        sent = await tg_bot.send_message(
                             **kwargs,
                             text=f"__User sent an unsupported message {msg.type}__",
                         )
                         _logger.warning(f"Unsupported message type: {msg.type}")
-                        return
 
-        except errors.FloodWait as e:
+        except tg_errors.FloodWait as e:
             await asyncio.sleep(e.value)
             continue
 
-        except errors.ReactionEmpty:
+        except tg_errors.ReactionEmpty:
             pass
 
-        except errors.TopicDeleted:
+        except tg_errors.TopicDeleted:
             # create new topic
             _logger.debug("his topic was deleted, creating new topic..")
             try:
