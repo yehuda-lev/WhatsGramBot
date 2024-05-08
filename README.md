@@ -86,27 +86,27 @@ This project was created by [@yehudalev](https://t.me/yehudalev).
 <details>
   <summary>Telegram Group (Desktop)</summary>
 
-![image](https://gist.github.com/assets/42866208/77c1da4e-1ab7-4d78-8984-56bb70901e24)
+   ![image](https://telegra.ph/file/ef167f2274e4a2c5f9cbc.jpg)
 </details>
 
 
 <details>
   <summary>WhatsApp Chat (Mobile)</summary>
 
-  ![image](https://gist.github.com/assets/42866208/7f2388af-c488-4ffe-8185-b1c77a830878)
+  ![image](https://telegra.ph/file/5c3aea0fed399835811a3.jpg)
 </details>
 
 <details>
   <summary>Telegram Group (Mobile)</summary>
 
-![image](https://gist.github.com/assets/42866208/5620636a-e6c2-40b2-a9c2-a6541f40a33e)
+  ![image](https://telegra.ph/file/dfa2e440fa513dee955ad.jpg)
 </details>
 
 
 <details>
   <summary>WhatsApp Chat (Desktop)</summary>
 
-   ![image](https://gist.github.com/assets/42866208/ef097026-857f-4d77-ac44-26875e076498)
+   ![image](https://telegra.ph/file/3c019201964436a4e21c3.jpg)
 </details>
 
 
