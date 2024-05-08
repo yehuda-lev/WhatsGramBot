@@ -111,7 +111,7 @@ async def on_message(_: Client, msg: tg_types.Message):
         _logger.debug("Timeout sending message to WhatsApp")
         await msg.reply(
             text=f"__trying to send {msg.media.name.lower()} message "
-            f"but the download failed because timeout set to {settings.timeout_httpx} __",
+            f"but the download failed because timeout set to {settings.httpx_timeout} __",
         )
 
     if sent:
