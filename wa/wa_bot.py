@@ -42,6 +42,11 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
         if msg.text or msg.caption
         else None
     )
+    if msg.forwarded:
+        text_forwarded = f"__This message was forwarded {'many times' if msg.forwarded_many_times else ''}__"
+        if not text:
+            text = text_forwarded
+        text = f"{text}\n\n{text_forwarded}"
 
     while True:
         user = repositoy.get_user_by_wa_id(wa_id=wa_id)
@@ -50,7 +55,11 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
         reply_msg = None
         if msg.is_reply:
             try:
-                reply_to = msg.message_id_to_reply
+                reply_to = (
+                    msg.reply_to_message.message_id
+                    if not msg.reaction
+                    else msg.message_id_to_reply
+                )
                 reply_msg = repositoy.get_message(wa_msg_id=reply_to, topic_msg_id=None)
             except NoResultFound:
                 pass
@@ -86,6 +95,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                         sent = await tg_bot.send_document(
                             **media_kwargs,
                             document=download,
+                            file_name=msg.media.filename,
                         )
                     case wa_types.MessageType.AUDIO:
                         if msg.media.voice:
@@ -104,6 +114,10 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                             sticker=download,
                         )
                     case _:
+                        await tg_bot.send_message(
+                            **kwargs,
+                            text=f"__Unsupported media type: {msg.type}__",
+                        )
                         _logger.warning(f"Unsupported media type: {msg.type}")
                         return
 
@@ -121,9 +135,10 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                                 **kwargs,
                                 first_name=contact.name.first_name,
                                 last_name=contact.name.last_name,
-                                phone_number=typing.cast(tuple, contact.phones)[
-                                    0
-                                ].phone,
+                                phone_number=(
+                                    typing.cast(tuple, contact.phones)[0].phone
+                                    or typing.cast(tuple, contact.phones)[0].wa_id
+                                ),
                                 vcard=contact.as_vcard(),
                             )
 
@@ -155,10 +170,20 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                             else:
                                 await tg_bot.send_message(
                                     **kwargs,
-                                    text=f"the user react {msg.reaction.emoji}",
+                                    text=f"__the user react {msg.reaction.emoji}__",
                                 )
 
+                    case wa_types.MessageType.UNSUPPORTED:
+                        await tg_bot.send_message(
+                            **kwargs,
+                            text="__User sent an unsupported message__",
+                        )
+
                     case _:
+                        await tg_bot.send_message(
+                            **kwargs,
+                            text=f"__User sent an unsupported message {msg.type}__",
+                        )
                         _logger.warning(f"Unsupported message type: {msg.type}")
                         return
 
