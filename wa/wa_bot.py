@@ -171,7 +171,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                             else:
                                 await tg_bot.send_message(
                                     **kwargs,
-                                    text=f"__the user react {msg.reaction.emoji}__",
+                                    text=f"__The user react with {msg.reaction.emoji}__",
                                 )
 
                     case wa_types.MessageType.UNSUPPORTED:
