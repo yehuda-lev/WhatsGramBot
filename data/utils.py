@@ -61,7 +61,7 @@ def get_wa_text_to_tg(text: str) -> str:
     return text
 
 
-async def create_topic(tg_bot: Client, wa_id: str, name: str) -> int:
+async def create_topic(tg_bot: Client, wa_id: str, name: str, is_new: bool) -> int:
     topic = await tg_bot.create_forum_topic(
         chat_id=settings.tg_group_topic_id,
         name=f"{name} | {wa_id}",
@@ -69,7 +69,7 @@ async def create_topic(tg_bot: Client, wa_id: str, name: str) -> int:
 
     sent = await tg_bot.send_message(
         chat_id=settings.tg_group_topic_id,
-        text=f"User {name} | {wa_id} created topic {topic.id}",
+        text=f"User {name} | {wa_id} {'re-' if is_new else ''}created topic {topic.id}",
         reply_parameters=tg_types.ReplyParameters(message_id=topic.id),
         reply_markup=tg_types.InlineKeyboardMarkup(
             inline_keyboard=[

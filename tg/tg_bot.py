@@ -97,7 +97,7 @@ async def on_message(_: Client, msg: tg_types.Message):
                 return
 
         else:
-            sent = _handle_other_message(
+            sent = await _handle_other_message(
                 msg=msg, reply_msg=reply_msg, text=text, msg_kwargs=kwargs
             )
 

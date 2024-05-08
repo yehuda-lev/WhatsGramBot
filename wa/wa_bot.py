@@ -224,13 +224,13 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                     case wa_types.MessageType.UNSUPPORTED:
                         sent = await tg_bot.send_message(
                             **kwargs,
-                            text="__User sent an unsupported message__",
+                            text="__User sent unsupported message__",
                         )
 
                     case _:
                         sent = await tg_bot.send_message(
                             **kwargs,
-                            text=f"__User sent an unsupported message {msg.type}__",
+                            text=f"__User sent unsupported message {msg.type}__",
                         )
                         _logger.warning(f"Unsupported message type: {msg.type}")
 
@@ -245,7 +245,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             # create new topic
             _logger.debug("his topic was deleted, creating new topic..")
             try:
-                new_topic_id = await utils.create_topic(tg_bot, wa_id, user.name)
+                new_topic_id = await utils.create_topic(tg_bot, wa_id, user.name, is_new=False)
                 repositoy.update_topic(tg_topic_id=topic_id, topic_id=new_topic_id)
             except Exception:  # noqa
                 _logger.exception(
