@@ -1,6 +1,7 @@
 import logging
 import mimetypes
 
+import httpx
 from pyrogram import types as tg_types, Client, enums
 from pywa_async import types as wa_types, errors
 from sqlalchemy.exc import NoResultFound
@@ -206,6 +207,13 @@ async def on_message(_: Client, msg: tg_types.Message):
             _logger.exception(e)
             await msg.reply(f"Error: __{e}__", quote=True)
 
+    except httpx.ReadTimeout:
+        _logger.debug("Timeout sending message to WhatsApp")
+        await msg.reply(
+            text=f"__trying to send {msg.media.name.lower()} message "
+                 f"but the download failed because timeout set to {settings.timeout_httpx} __",
+        )
+
     if sent:
         # read the last message the wa user sent
         try:
@@ -369,19 +377,22 @@ async def on_command(client: Client, msg: tg_types.Message):
                         [
                             tg_types.InlineKeyboardButton(
                                 text=f"Chat opened: {'disable ❌' if chat_opened_enable else 'enable ✅'}",
-                                callback_data=f"settings_chat_opened_enable_{'Disable' if chat_opened_enable else 'Enable'}",
+                                callback_data=f"settings_chat_opened_enable_"
+                                f"{'disable' if chat_opened_enable else 'enable'}",
                             ),
                         ],
                         [
                             tg_types.InlineKeyboardButton(
                                 text=f"Welcome message {'disable ❌' if welcome_msg else 'enable ✅'}",
-                                callback_data=f"settings_welcome_msg_{'Disable' if welcome_msg else 'Enable'}",
+                                callback_data=f"settings_welcome_msg_"
+                                f"{'disable' if welcome_msg else 'enable'}",
                             ),
                         ],
                         [
                             tg_types.InlineKeyboardButton(
                                 text=f"Mark as read {'disable ❌' if mark_as_read else 'enable ✅'}",
-                                callback_data=f"settings_mark_as_read_{'Disable' if mark_as_read else 'Enable'}",
+                                callback_data=f"settings_mark_as_read_"
+                                f"{'disable' if mark_as_read else 'enable'}",
                             ),
                         ],
                         [
@@ -424,7 +435,7 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
 
     if cbd_data.startswith("settings"):
         if cbd_data.startswith("settings_chat_opened_enable"):
-            chat_opened_enable = cbd_data.split("_")[-1].lower() == "enable"
+            chat_opened_enable = cbd_data.split("_")[-1] == "enable"
             repositoy.update_settings(wa_chat_opened_enable=chat_opened_enable)
 
             # update the chat_opened in the bot on WhatsApp
@@ -438,14 +449,14 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
             )
 
         elif cbd_data.startswith("settings_welcome_msg"):
-            welcome_msg = cbd_data.split("_")[-1].lower() == "enable"
+            welcome_msg = cbd_data.split("_")[-1] == "enable"
             repositoy.update_settings(wa_welcome_msg=welcome_msg)
             await cbd.message.edit_text(
                 f"Welcome message is {'enabled' if welcome_msg else 'disabled'} now"
             )
 
         elif cbd_data.startswith("settings_mark_as_read"):
-            mark_as_read = cbd_data.split("_")[-1].lower() == "enable"
+            mark_as_read = cbd_data.split("_")[-1] == "enable"
             repositoy.update_settings(wa_mark_as_read=mark_as_read)
             await cbd.message.edit_text(
                 f"Mark as read is {'enabled' if mark_as_read else 'disabled'} now"

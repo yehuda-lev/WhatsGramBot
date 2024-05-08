@@ -26,8 +26,7 @@ class Settings(BaseSettings):
     port: int
     webhook_endpoint: str
 
-    wa_phone_test: int
-    tg_id_test: int
+    timeout_httpx: float
 
 
 @lru_cache

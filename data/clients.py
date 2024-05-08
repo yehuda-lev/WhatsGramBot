@@ -1,4 +1,5 @@
 import logging
+import httpx
 from pyrogram import Client
 from pywa_async import WhatsApp
 from fastapi import FastAPI
@@ -22,6 +23,7 @@ tg_bot = Client(
 # whatsapp
 app = FastAPI()
 
+httpx_session = httpx.AsyncClient(timeout=httpx.Timeout(timeout=settings.timeout_httpx))
 wa_bot = WhatsApp(
     phone_id=settings.wa_phone_id,
     token=settings.wa_token,
@@ -32,4 +34,5 @@ wa_bot = WhatsApp(
     app_id=settings.app_id,
     app_secret=settings.app_secret,
     verify_timeout=10,
+    session=httpx_session,
 )

@@ -1,7 +1,8 @@
 pyrotgfork==2.1.29
 TgCrypto==1.2.5
-https://github.com/david-lev/pywa/archive/6a2841cdaf50811a2aa904b734d1a7b5a8417995.zip  # async
+pywa~=1.18.1
 uvicorn==0.29.0
 fastapi==0.111.0
 SQLAlchemy==2.0.30
 pydantic-settings==2.2.1
+httpx~=0.27.0

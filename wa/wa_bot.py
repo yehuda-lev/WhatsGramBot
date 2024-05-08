@@ -2,6 +2,7 @@ import asyncio
 import io
 import logging
 import typing
+import httpx
 from pywa_async import types as wa_types, WhatsApp
 from pyrogram import types as tg_types, errors
 from sqlalchemy.exc import NoResultFound
@@ -210,6 +211,13 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                 )
                 return
             continue
+
+        except httpx.ReadTimeout:
+            _logger.debug("Timeout sending message to telegram")
+            sent = await tg_bot.send_message(
+                **kwargs,
+                text=f"__The user send {msg.type} message but the download failed because timeout set to {settings.timeout_httpx} __",
+            )
 
         except Exception as e:  # noqa
             _logger.exception(
