@@ -40,7 +40,7 @@ async def on_message(_: Client, msg: tg_types.Message):
     kwargs = dict(to=wa_id, tracker=modules.Tracker(chat_id=msg.chat.id, msg_id=msg.id))
 
     text = (
-        utils.get_tg_text_to_wa(msg.text.markdown or msg.caption.markdown)
+        utils.get_tg_text_to_wa((msg.text or msg.caption).markdown)
         if msg.text or msg.caption
         else None
     )
@@ -61,7 +61,7 @@ async def on_message(_: Client, msg: tg_types.Message):
             media = getattr(msg, msg.media.name.lower())
             if (media.file_size or 0) > (20 * 1024 * 1024):
                 await msg.reply(
-                    "Media size is more than 20MB, can't send it to WhatsApp",
+                    "__Media size is more than 20MB, can't send it to WhatsApp__",
                     quote=True,
                 )
                 return
@@ -98,6 +98,7 @@ async def on_message(_: Client, msg: tg_types.Message):
                             **media_kwargs, photo=download, mime_type="image/jpeg"
                         )
                     else:
+                        await msg.reply("__Unsupported story type__", quote=True)
                         _logger.warning(f"Unsupported story type: {msg.story}")
                         return
 
@@ -141,7 +142,7 @@ async def on_message(_: Client, msg: tg_types.Message):
                 case enums.MessageMediaType.STICKER:
                     if media.is_animated:
                         await msg.reply(
-                            "Animated stickers are not supported", quote=True
+                            "__Animated stickers are not supported__", quote=True
                         )
                         return
 
@@ -158,6 +159,9 @@ async def on_message(_: Client, msg: tg_types.Message):
                 sent = await wa_bot.send_message(
                     **kwargs,
                     text=text,
+                    preview_url=msg.link_preview_options.is_disabled
+                    if msg.link_preview_options
+                    else None,
                     reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
                 )
             elif msg.location or msg.venue:
