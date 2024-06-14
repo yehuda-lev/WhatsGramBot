@@ -124,7 +124,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
         try:
             if msg.has_media:
                 download = io.BytesIO(await msg.download_media(in_memory=True))
-                download.name = f"{msg.type}{msg.media.extension}"
+                download.name = f"{msg.type}{msg.media.extension or ''}"
                 media_kwargs = dict(
                     **kwargs,
                     caption=text,
