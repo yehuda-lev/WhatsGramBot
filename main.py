@@ -52,5 +52,5 @@ def run_wa():
 
 if __name__ == "__main__":
     tg_bot.start()
-    threading.Thread(target=run_wa).start()
+    tg_bot.loop.run_in_executor(tg_bot.executor, run_wa)
     idle()
