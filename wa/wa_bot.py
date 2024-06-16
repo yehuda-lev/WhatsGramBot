@@ -52,7 +52,7 @@ async def on_failed_status(
 ):
     await tg_bot.send_message(
         chat_id=status.tracker.chat_id,
-        text=f"__Failed to send to WhatsApp.__\n> **{status.error.message}**\n> {status.error.details}",
+        text=f"__Failed to send to WhatsApp.__\n> **{status.error.message}**\n{('> ' + status.error.details) if status.error.details else ''}",
         reply_parameters=tg_types.ReplyParameters(message_id=status.tracker.msg_id),
     )
     if isinstance(status.error, wa_errors.ReEngagementMessage):  # 24 hours passed
