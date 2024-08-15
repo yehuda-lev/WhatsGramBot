@@ -352,8 +352,8 @@ async def on_command(client: Client, msg: tg_types.Message):
         topic = repositoy.get_topic_by_topic_id(topic_id=topic_id)
     except sqlalchemy_errors.NoResultFound:
         topic = None
-
-    if msg.text == "/info":
+    cmd, _ = msg.text.split("@", maxsplit=1) if "@" in msg.text else (msg.text, None)
+    if cmd == "/info":
         if topic is None:
             await msg.reply("No topic found", quote=True)
             return
@@ -382,15 +382,14 @@ async def on_command(client: Client, msg: tg_types.Message):
             ),
         )
 
-    elif msg.text == "/request_location":
+    elif cmd == "/request_location":
         if topic is None:
             await msg.reply("No topic found", quote=True)
             return
 
-        await wa_bot.request_location(to=topic.user.wa_id)
-        await msg.reply("Location requested", quote=True)
+        await wa_bot.request_location(to=topic.user.wa_id, text="Location requested")
 
-    elif msg.text in ["/settings", "/ban", "/unban"]:
+    elif cmd in ["/settings", "/ban", "/unban"]:
         # check if the user is admin in the group
         user = await client.get_chat_member(msg.chat.id, msg.from_user.id)
         if user.status not in (
@@ -400,7 +399,7 @@ async def on_command(client: Client, msg: tg_types.Message):
             await msg.reply("You are not admin in the group", quote=True)
             return
 
-        if msg.text == "/settings":
+        if cmd == "/settings":
             try:
                 db_settings = repositoy.get_settings()
                 chat_opened_enable = db_settings.wa_chat_opened_enable
@@ -457,7 +456,7 @@ async def on_command(client: Client, msg: tg_types.Message):
                 ),
             )
 
-        elif msg.text == "/ban":
+        elif cmd == "/ban":
             if not topic:
                 await msg.reply("No topic found", quote=True)
                 return
@@ -471,7 +470,7 @@ async def on_command(client: Client, msg: tg_types.Message):
             repositoy.update_user(wa_id=topic.user.wa_id, banned=True)
             await msg.reply("User banned", quote=True)
 
-        elif msg.text == "/unban":
+        elif cmd == "/unban":
             if not topic:
                 await msg.reply("No topic found", quote=True)
                 return
