@@ -1,8 +1,7 @@
 import logging
-import threading
 from logging.handlers import RotatingFileHandler
 import uvicorn
-from pyrogram import __version__ as tg_version, idle, raw
+from pyrogram import __version__ as tg_version, idle, raw, types as tg_types
 from pywa_async import __version__ as wa_version
 
 from data import config, clients
@@ -52,5 +51,15 @@ def run_wa():
 
 if __name__ == "__main__":
     tg_bot.start()
+    tg_bot.set_bot_commands(
+        [
+            tg_types.BotCommand(command="info", description="Get info about this user"),
+            tg_types.BotCommand(command="request_location", description="Ask for location"),
+            tg_types.BotCommand(command="ban", description="Ban user"),
+            tg_types.BotCommand(command="unban", description="Unban user"),
+            tg_types.BotCommand(command="settings", description="Update settings"),
+        ],
+        scope=tg_types.BotCommandScopeChat(settings.tg_group_topic_id),
+    )
     tg_bot.loop.run_in_executor(tg_bot.executor, run_wa)
     idle()

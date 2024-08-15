@@ -18,34 +18,10 @@ settings = config.get_settings()
 send_to = settings.tg_group_topic_id
 
 
-def check_if_update_in_process(
-    func: typing.Callable[[WhatsApp, typing.Any], typing.Awaitable[typing.Any]],
-):
-    updates_in_process: set[str]() = set()
-
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        update = args[1]
-        if update.id in updates_in_process:
-            txt = f"Your function {func.__name__} is too slow, {update.__class__.__name__} (%s) is already in process"
-            _logger.warning(txt, update.id)
-            _logger.debug(txt, update)
-            return
-        updates_in_process.add(update.id)
-        try:
-            return await func(*args, **kwargs)
-        finally:
-            updates_in_process.remove(update.id)
-
-    return wrapper
-
-
-@check_if_update_in_process
 async def get_chat_opened(_: WhatsApp, __: wa_types.ChatOpened):
     pass
 
 
-@check_if_update_in_process
 async def on_failed_status(
     _: WhatsApp,
     status: wa_types.MessageStatus,  # TODO [modules.Tracker]
@@ -61,7 +37,6 @@ async def on_failed_status(
         _logger.error(status.error)
 
 
-@check_if_update_in_process
 async def on_command_start(_: WhatsApp, msg: wa_types.Message):
     # get text welcome message
     try:
@@ -76,7 +51,6 @@ async def on_command_start(_: WhatsApp, msg: wa_types.Message):
         await msg.reply(text_welcome.text)
 
 
-@check_if_update_in_process
 async def get_message(_: WhatsApp, msg: wa_types.Message):
     try:
         repositoy.get_message(wa_msg_id=msg.id, topic_msg_id=None)

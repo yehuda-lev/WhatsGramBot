@@ -382,6 +382,14 @@ async def on_command(client: Client, msg: tg_types.Message):
             ),
         )
 
+    elif msg.text == "/request_location":
+        if topic is None:
+            await msg.reply("No topic found", quote=True)
+            return
+
+        await wa_bot.request_location(to=topic.user.wa_id)
+        await msg.reply("Location requested", quote=True)
+
     elif msg.text in ["/settings", "/ban", "/unban"]:
         # check if the user is admin in the group
         user = await client.get_chat_member(msg.chat.id, msg.from_user.id)

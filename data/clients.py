@@ -33,6 +33,6 @@ wa_bot = WhatsApp(
     webhook_endpoint=settings.wa_webhook_endpoint,
     app_id=settings.wa_app_id,
     app_secret=settings.wa_app_secret,
-    verify_timeout=10,
+    webhook_challenge_delay=10,
     session=httpx_session,
 )
