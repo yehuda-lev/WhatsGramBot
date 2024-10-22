@@ -231,7 +231,7 @@ async def _handle_media_message(
         case _:
             return None
 
-    return sent
+    return sent.id
 
 
 async def _handle_other_message(
@@ -281,7 +281,7 @@ async def _handle_other_message(
                 ],
             ),
         )
-    return sent
+    return sent.id
 
 
 async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
