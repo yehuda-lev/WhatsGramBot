@@ -5,7 +5,7 @@ from pyrogram import __version__ as tg_version, idle, raw, types as tg_types
 from pywa_async import __version__ as wa_version
 
 from data import config, clients
-from wa import handlers as wa_handlers
+from wa import wa_bot
 from tg import handlers as tg_handlers
 
 
@@ -40,8 +40,7 @@ wa_bot = clients.wa_bot
 for tg_handler in tg_handlers.HANDLERS:
     tg_bot.add_handler(tg_handler)
 
-for wa_handler in wa_handlers.HANDLERS:
-    wa_bot.add_handlers(wa_handler)
+wa_bot.load_handlers_modules(wa_bot)
 
 
 # run server
