@@ -54,7 +54,9 @@ if __name__ == "__main__":
     tg_bot.set_bot_commands(
         [
             tg_types.BotCommand(command="info", description="Get info about this user"),
-            tg_types.BotCommand(command="request_location", description="Ask for location"),
+            tg_types.BotCommand(
+                command="request_location", description="Ask for location"
+            ),
             tg_types.BotCommand(command="ban", description="Ban user"),
             tg_types.BotCommand(command="unban", description="Unban user"),
             tg_types.BotCommand(command="settings", description="Update settings"),

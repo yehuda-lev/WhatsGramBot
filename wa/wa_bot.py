@@ -1,5 +1,4 @@
 import asyncio
-import functools
 import io
 import logging
 import typing
@@ -220,7 +219,9 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             # create new topic
             _logger.debug("his topic was deleted, creating new topic..")
             try:
-                new_topic_id = await utils.create_topic(tg_bot, wa_id, user.name, is_new=False)
+                new_topic_id = await utils.create_topic(
+                    tg_bot, wa_id, user.name, is_new=False
+                )
                 repositoy.update_topic(tg_topic_id=topic_id, topic_id=new_topic_id)
             except Exception:  # noqa
                 _logger.exception(

@@ -12,7 +12,9 @@ settings = config.get_settings()
 tg_bot = clients.tg_bot
 
 
-async def create_user(_: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened) -> bool:
+async def _create_user(
+    _: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened
+) -> bool:
     wa_id = msg.sender
     name = msg.from_user.name
 
@@ -61,24 +63,24 @@ async def create_user(_: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened) 
     return True
 
 
+create_user = filters.new(_create_user)
+
+
 HANDLERS = [
     handlers.ChatOpenedHandler(
-        wa_bot.get_chat_opened,
-        create_user,
+        callback=wa_bot.get_chat_opened,
+        filters=create_user,
     ),
     handlers.MessageHandler(
-        wa_bot.on_command_start,
-        filters.text.command("start"),
-        create_user,
+        callback=wa_bot.on_command_start,
+        filters=filters.command("start") & create_user,
     ),
     handlers.MessageHandler(
-        wa_bot.get_message,
-        filters.not_(filters.text.is_command),
-        create_user,
+        callback=wa_bot.get_message, filters=~filters.is_command & create_user
     ),
     handlers.MessageStatusHandler(
-        wa_bot.on_failed_status,
-        filters.message_status.failed,
+        callback=wa_bot.on_failed_status,
+        filters=filters.failed,
         factory=modules.Tracker,
     ),
 ]
