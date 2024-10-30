@@ -1,7 +1,6 @@
 pyrotgfork==2.1.33.11
 TgCrypto==1.2.5
-# pywa==1.25.0
-https://github.com/david-lev/pywa/archive/refs/heads/v2.zip
+pywa==2.0.2
 uvicorn==0.32.0
 fastapi==0.115.3
 SQLAlchemy==2.0.36
