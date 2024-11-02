@@ -1,10 +1,9 @@
 import asyncio
-import functools
 import io
 import logging
 import typing
 import httpx
-from pywa_async import types as wa_types, errors as wa_errors, WhatsApp
+from pywa_async import types as wa_types, errors as wa_errors, WhatsApp, filters
 from pyrogram import types as tg_types, errors as tg_errors
 from sqlalchemy.exc import NoResultFound
 
@@ -18,10 +17,66 @@ settings = config.get_settings()
 send_to = settings.tg_group_topic_id
 
 
+async def _create_user(
+    _: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened
+) -> bool:
+    wa_id = msg.sender
+    name = msg.from_user.name
+
+    try:  # try to get user and update status
+        user = repositoy.get_user_by_wa_id(wa_id=wa_id)
+        if not user.active:
+            repositoy.update_user(wa_id=wa_id, active=True)
+        if user.banned:
+            return False
+    except NoResultFound:  # if user not exists than create user
+        try:  # get if wa_chat_opened_enable and if wa_welcome_msg
+            db_settings = repositoy.get_settings()
+            chat_opened_enable = db_settings.wa_chat_opened_enable
+            welcome_msg = db_settings.wa_welcome_msg
+        except NoResultFound:
+            repositoy.create_settings()
+            chat_opened_enable = False
+            welcome_msg = False
+
+        # get text welcome message
+        text_welcome = None
+        if welcome_msg:
+            try:
+                text_welcome = repositoy.get_message_to_send(
+                    type_event=modules.EventType.MSG_WELCOME
+                )
+            except NoResultFound:
+                pass
+
+        if isinstance(msg, wa_types.ChatOpened) and not chat_opened_enable:
+            return False
+
+        if welcome_msg and text_welcome:
+            if not (
+                isinstance(msg, wa_types.Message) and not msg.text.startswith("/start")
+            ):
+                await msg.reply(text_welcome.text)
+
+        # create user and topic
+        topic_id = await utils.create_topic(tg_bot, wa_id, name, is_new=True)
+        repositoy.create_user_and_topic(
+            wa_id=wa_id,
+            name=name,
+            topic_id=topic_id,
+        )
+    return True
+
+
+create_user = filters.new(_create_user)
+
+
+@WhatsApp.on_chat_opened(filters=create_user)
 async def get_chat_opened(_: WhatsApp, __: wa_types.ChatOpened):
     pass
 
 
+@WhatsApp.on_message_status(filters=filters.failed, factory=modules.Tracker)
 async def on_failed_status(
     _: WhatsApp,
     status: wa_types.MessageStatus,  # TODO [modules.Tracker]
@@ -37,6 +92,7 @@ async def on_failed_status(
         _logger.error(status.error)
 
 
+@WhatsApp.on_message(filters=filters.command("start") & create_user)
 async def on_command_start(_: WhatsApp, msg: wa_types.Message):
     # get text welcome message
     try:
@@ -51,6 +107,7 @@ async def on_command_start(_: WhatsApp, msg: wa_types.Message):
         await msg.reply(text_welcome.text)
 
 
+@WhatsApp.on_message(filters=~filters.is_command & create_user)
 async def get_message(_: WhatsApp, msg: wa_types.Message):
     try:
         repositoy.get_message(wa_msg_id=msg.id, topic_msg_id=None)
@@ -220,7 +277,9 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             # create new topic
             _logger.debug("his topic was deleted, creating new topic..")
             try:
-                new_topic_id = await utils.create_topic(tg_bot, wa_id, user.name, is_new=False)
+                new_topic_id = await utils.create_topic(
+                    tg_bot, wa_id, user.name, is_new=False
+                )
                 repositoy.update_topic(tg_topic_id=topic_id, topic_id=new_topic_id)
             except Exception:  # noqa
                 _logger.exception(

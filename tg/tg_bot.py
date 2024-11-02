@@ -231,7 +231,7 @@ async def _handle_media_message(
         case _:
             return None
 
-    return sent
+    return sent.id
 
 
 async def _handle_other_message(
@@ -281,7 +281,7 @@ async def _handle_other_message(
                 ],
             ),
         )
-    return sent
+    return sent.id
 
 
 async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
@@ -465,7 +465,9 @@ async def on_command(client: Client, msg: tg_types.Message):
                 await msg.reply("User already banned", quote=True)
                 return
 
-            await client.close_forum_topic(chat_id=msg.chat.id, message_thread_id=topic_id)
+            await client.close_forum_topic(
+                chat_id=msg.chat.id, message_thread_id=topic_id
+            )
 
             repositoy.update_user(wa_id=topic.user.wa_id, banned=True)
             await msg.reply("User banned", quote=True)
@@ -479,7 +481,9 @@ async def on_command(client: Client, msg: tg_types.Message):
                 await msg.reply("User already unbanned", quote=True)
                 return
 
-            await client.reopen_forum_topic(chat_id=msg.chat.id, message_thread_id=topic_id)
+            await client.reopen_forum_topic(
+                chat_id=msg.chat.id, message_thread_id=topic_id
+            )
 
             repositoy.update_user(wa_id=topic.user.wa_id, banned=False)
             await msg.reply("User unbanned", quote=True)

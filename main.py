@@ -5,7 +5,7 @@ from pyrogram import __version__ as tg_version, idle, raw, types as tg_types
 from pywa_async import __version__ as wa_version
 
 from data import config, clients
-from wa import handlers as wa_handlers
+from wa import wa_bot as wa_bot_handlers_module
 from tg import handlers as tg_handlers
 
 
@@ -40,8 +40,7 @@ wa_bot = clients.wa_bot
 for tg_handler in tg_handlers.HANDLERS:
     tg_bot.add_handler(tg_handler)
 
-for wa_handler in wa_handlers.HANDLERS:
-    wa_bot.add_handlers(wa_handler)
+wa_bot.load_handlers_modules(wa_bot_handlers_module)
 
 
 # run server
@@ -54,7 +53,9 @@ if __name__ == "__main__":
     tg_bot.set_bot_commands(
         [
             tg_types.BotCommand(command="info", description="Get info about this user"),
-            tg_types.BotCommand(command="request_location", description="Ask for location"),
+            tg_types.BotCommand(
+                command="request_location", description="Ask for location"
+            ),
             tg_types.BotCommand(command="ban", description="Ban user"),
             tg_types.BotCommand(command="unban", description="Unban user"),
             tg_types.BotCommand(command="settings", description="Update settings"),
