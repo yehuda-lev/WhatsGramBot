@@ -138,6 +138,8 @@ async def on_message(_: Client, msg: tg_types.Message):
             wa_id=wa_id,
             sent_from_tg=True,
         )
+    else:
+        await msg.reply("__Unsupported message type__", quote=True)
 
 
 async def _handle_media_message(
@@ -281,7 +283,7 @@ async def _handle_other_message(
                 ],
             ),
         )
-    return sent.id
+    return sent.id if sent else sent
 
 
 async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
