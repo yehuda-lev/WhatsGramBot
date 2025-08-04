@@ -76,6 +76,37 @@ async def get_chat_opened(_: WhatsApp, __: wa_types.ChatOpened):
     pass
 
 
+@WhatsApp.on_phone_number_change
+async def on_phone_number_change(
+    wa: WhatsApp,
+    event: wa_types.PhoneNumberChange,
+):
+    topic = repositoy.get_user_by_wa_id(wa_id=event.sender).topic
+    new_name = utils.get_topic_name(
+        wa_id=event.new_wa_id, name=utils.get_user_name_from_topic_name(topic.name)
+    )
+    repositoy.update_wa_id(
+        old_wa_id=event.old_wa_id,
+        new_wa_id=event.new_wa_id,
+    )
+    repositoy.update_topic(tg_topic_id=topic.topic_id, name=new_name)
+    await tg_bot.edit_forum_topic(
+        chat_id=settings.tg_group_topic_id,
+        topic_id=topic.topic_id,
+        name=new_name,
+    )
+    # TODO edit the first message & button in the topic (pinned message)
+    await tg_bot.send_message(
+        chat_id=settings.tg_group_topic_id,
+        text=f"__User {event.old_wa_id} changed phone number to {event.new_wa_id}__",
+        reply_parameters=tg_types.ReplyParameters(message_id=topic.topic_id),
+    )
+    await wa.send_message(
+        to=event.new_wa_id,
+        text=f"_Your phone number has been changed to {event.new_wa_id}_",
+    )
+
+
 @WhatsApp.on_message_status(filters=filters.failed, factory=modules.Tracker)
 async def on_failed_status(
     _: WhatsApp,

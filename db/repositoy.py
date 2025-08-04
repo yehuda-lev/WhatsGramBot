@@ -56,6 +56,26 @@ def get_user_by_wa_id(*, wa_id: str) -> WaUser:
         return session.query(WaUser).filter(WaUser.wa_id == wa_id).one()
 
 
+def update_wa_id(*, old_wa_id: str, new_wa_id: str):
+    """
+    Update wa_id of user
+
+    :param old_wa_id: the current number of the user
+    :param new_wa_id: the new number of the user
+    :return:
+    """
+    _logger.debug(f"update wa_id from {old_wa_id} to {new_wa_id}")
+    cache.delete(
+        cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=old_wa_id)
+    )
+
+    with get_session() as session:
+        session.query(WaUser).filter(WaUser.wa_id == old_wa_id).update(
+            {"wa_id": new_wa_id}
+        )
+        session.commit()
+
+
 @cache.cachable(cache_name="get_topic_by_topic_id", params=("topic_id",))
 def get_topic_by_topic_id(*, topic_id: int) -> Topic:
     """

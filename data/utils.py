@@ -41,6 +41,17 @@ def get_tg_text_to_wa(text: str) -> str:
     return text
 
 
+def get_topic_name(wa_id: str, name: str) -> str:
+    return f"{name} | {wa_id}"
+
+
+def get_user_name_from_topic_name(topic_name: str) -> str:
+    parts = topic_name.split(" | ")
+    if len(parts) < 2:
+        return topic_name
+    return " | ".join(parts[:-1])
+
+
 def get_wa_text_to_tg(text: str) -> str:
     """Convert WhatsApp text formatting to Telegram text formatting.
     Args:
@@ -64,12 +75,12 @@ def get_wa_text_to_tg(text: str) -> str:
 async def create_topic(tg_bot: Client, wa_id: str, name: str, is_new: bool) -> int:
     topic = await tg_bot.create_forum_topic(
         chat_id=settings.tg_group_topic_id,
-        name=f"{name} | {wa_id}",
+        name=get_topic_name(wa_id, name),
     )
 
     sent = await tg_bot.send_message(
         chat_id=settings.tg_group_topic_id,
-        text=f"User {name} | {wa_id} {'re-' if is_new else ''}created topic {topic.id}",
+        text=f"User {name} | {wa_id} {'' if is_new else 're-'}created topic {topic.id}",
         reply_parameters=tg_types.ReplyParameters(message_id=topic.id),
         reply_markup=tg_types.InlineKeyboardMarkup(
             inline_keyboard=[
