@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # Make port 8082 available to the world outside this container
-ARG PORT=8080
+ARG PORT=8082
 ENV PORT=$PORT
 
 # Expose the port configured by the environment variable
