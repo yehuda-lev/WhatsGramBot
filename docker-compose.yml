@@ -6,13 +6,14 @@ services:
       args:
         PORT: ${PORT}
     ports:
-      - "${PORT}:${PORT}"
+    - "${HOST_PORT}:${PORT}"
     env_file:
       - .env
     environment:
       - TZ=Asia/Jerusalem
     platform: linux/amd64
-    container_name: whatsgrambot
+    restart: always
+    container_name: ${CONTAINER_NAME}
     volumes:
       - ./:/whatsgrambot
     command: ["python", "main.py"]
