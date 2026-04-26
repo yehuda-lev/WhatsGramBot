@@ -1,4 +1,4 @@
-pyrotgfork==2.1.33.11
+pyrotgfork==2.2.23
 TgCrypto==1.2.5
 pywa==3.0.0
 uvicorn==0.32.0

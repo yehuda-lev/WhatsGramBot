@@ -12,7 +12,6 @@ from db import repositoy
 
 _logger = logging.getLogger(__name__)
 
-tg_bot = clients.tg_bot
 settings = config.get_settings()
 send_to = settings.tg_group_topic_id
 
@@ -59,7 +58,7 @@ async def _create_user(
                 await msg.reply(text_welcome.text)
 
         # create user and topic
-        topic_id = await utils.create_topic(tg_bot, wa_id, name, is_new=True)
+        topic_id = await utils.create_topic(clients.tg_bot, wa_id, name, is_new=True)
         repositoy.create_user_and_topic(
             wa_id=wa_id,
             name=name,
@@ -90,13 +89,13 @@ async def on_phone_number_change(
         new_wa_id=event.new_wa_id,
     )
     repositoy.update_topic(tg_topic_id=topic.topic_id, name=new_name)
-    await tg_bot.edit_forum_topic(
+    await clients.tg_bot.edit_forum_topic(
         chat_id=settings.tg_group_topic_id,
         topic_id=topic.topic_id,
         name=new_name,
     )
     # TODO edit the first message & button in the topic (pinned message)
-    await tg_bot.send_message(
+    await clients.tg_bot.send_message(
         chat_id=settings.tg_group_topic_id,
         text=f"__User {event.old_wa_id} changed phone number to {event.new_wa_id}__",
         reply_parameters=tg_types.ReplyParameters(message_id=topic.topic_id),
@@ -112,7 +111,7 @@ async def on_failed_status(
     _: WhatsApp,
     status: wa_types.MessageStatus,  # TODO [modules.Tracker]
 ):
-    await tg_bot.send_message(
+    await clients.tg_bot.send_message(
         chat_id=status.tracker.chat_id,
         text=f"__Failed to send to WhatsApp.__\n> **{status.error.message}**\n{('> ' + status.error.details) if status.error.details else ''}",
         reply_parameters=tg_types.ReplyParameters(message_id=status.tracker.msg_id),
@@ -194,39 +193,39 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
 
                 match msg.type:
                     case wa_types.MessageType.IMAGE:
-                        sent = await tg_bot.send_photo(
+                        sent = await clients.tg_bot.send_photo(
                             **media_kwargs,
                             photo=download,
                         )
                     case wa_types.MessageType.VIDEO:
-                        sent = await tg_bot.send_video(
+                        sent = await clients.tg_bot.send_video(
                             **media_kwargs,
                             video=download,
                         )
                     case wa_types.MessageType.DOCUMENT:
-                        sent = await tg_bot.send_document(
+                        sent = await clients.tg_bot.send_document(
                             **media_kwargs,
                             document=download,
                             file_name=msg.media.filename,
                         )
                     case wa_types.MessageType.AUDIO:
                         if msg.media.voice:
-                            sent = await tg_bot.send_voice(
+                            sent = await clients.tg_bot.send_voice(
                                 **media_kwargs,
                                 voice=download,
                             )
                         else:
-                            sent = await tg_bot.send_audio(
+                            sent = await clients.tg_bot.send_audio(
                                 **media_kwargs,
                                 audio=download,
                             )
                     case wa_types.MessageType.STICKER:
-                        sent = await tg_bot.send_sticker(
+                        sent = await clients.tg_bot.send_sticker(
                             **media_kwargs,
                             sticker=download,
                         )
                     case _:
-                        sent = await tg_bot.send_message(
+                        sent = await clients.tg_bot.send_message(
                             **kwargs,
                             text=f"__User sent an unsupported media type {msg.type}__",
                         )
@@ -235,14 +234,14 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             else:
                 match msg.type:
                     case wa_types.MessageType.TEXT:
-                        sent = await tg_bot.send_message(
+                        sent = await clients.tg_bot.send_message(
                             **kwargs,
                             text=text,
                         )
 
                     case wa_types.MessageType.CONTACTS:
                         for contact in msg.contacts:
-                            sent = await tg_bot.send_contact(
+                            sent = await clients.tg_bot.send_contact(
                                 **kwargs,
                                 first_name=contact.name.first_name,
                                 last_name=contact.name.last_name,
@@ -254,7 +253,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                             )
 
                     case wa_types.MessageType.LOCATION:
-                        sent = await tg_bot.send_location(
+                        sent = await clients.tg_bot.send_location(
                             **kwargs,
                             latitude=msg.location.latitude,
                             longitude=msg.location.longitude,
@@ -262,14 +261,14 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
 
                     case wa_types.MessageType.REACTION:
                         if msg.reaction.is_removed:
-                            await tg_bot.set_reaction(
+                            await clients.tg_bot.set_reaction(
                                 chat_id=send_to,
                                 message_id=reply_msg.topic_msg_id,
                                 reaction=None,
                             )
                         else:
                             if msg.reaction.emoji in EMOJIS:
-                                await tg_bot.set_reaction(
+                                await clients.tg_bot.set_reaction(
                                     chat_id=send_to,
                                     message_id=reply_msg.topic_msg_id,
                                     reaction=[
@@ -279,19 +278,19 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
                                     ],
                                 )
                             else:
-                                await tg_bot.send_message(
+                                await clients.tg_bot.send_message(
                                     **kwargs,
                                     text=f"__The user react with {msg.reaction.emoji}__",
                                 )
 
                     case wa_types.MessageType.UNSUPPORTED:
-                        sent = await tg_bot.send_message(
+                        sent = await clients.tg_bot.send_message(
                             **kwargs,
                             text="__User sent unsupported message__",
                         )
 
                     case _:
-                        sent = await tg_bot.send_message(
+                        sent = await clients.tg_bot.send_message(
                             **kwargs,
                             text=f"__User sent unsupported message {msg.type}__",
                         )
@@ -309,7 +308,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             _logger.debug("his topic was deleted, creating new topic..")
             try:
                 new_topic_id = await utils.create_topic(
-                    tg_bot, wa_id, user.name, is_new=False
+                    clients.tg_bot, wa_id, user.name, is_new=False
                 )
                 repositoy.update_topic(tg_topic_id=topic_id, topic_id=new_topic_id)
             except Exception:  # noqa
@@ -321,7 +320,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
 
         except httpx.ReadTimeout:
             _logger.debug("Timeout sending message to telegram")
-            sent = await tg_bot.send_message(
+            sent = await clients.tg_bot.send_message(
                 **kwargs,
                 text=f"__The user send {msg.type} message but the download failed because timeout set to {settings.httpx_timeout} __",
             )

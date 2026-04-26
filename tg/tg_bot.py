@@ -12,7 +12,6 @@ from db import repositoy
 
 _logger = logging.getLogger(__name__)
 
-wa_bot = clients.wa_bot
 settings = config.get_settings()
 
 media_kb_limit = {
@@ -124,7 +123,7 @@ async def on_message(_: Client, msg: tg_types.Message):
                 if (
                     not message_to_read.sent_from_tg
                 ):  # the last message to read is from whatsapp
-                    await wa_bot.mark_message_as_read(
+                    await clients.wa_bot.mark_message_as_read(
                         message_id=message_to_read.wa_msg_id
                     )
         except (sqlalchemy_errors.NoResultFound, wa_errors.WhatsAppError):
@@ -156,12 +155,12 @@ async def _handle_media_message(
     )
     match msg.media:
         case enums.MessageMediaType.PHOTO:
-            sent = await wa_bot.send_image(
+            sent = await clients.wa_bot.send_image(
                 **media_kwargs, image=download, mime_type="image/jpeg"
             )
 
         case enums.MessageMediaType.VIDEO:
-            sent = await wa_bot.send_video(
+            sent = await clients.wa_bot.send_video(
                 **media_kwargs,
                 video=download,
                 mime_type=msg.video.mime_type or "video/mp4",
@@ -169,13 +168,13 @@ async def _handle_media_message(
 
         case enums.MessageMediaType.STORY:
             if msg.story.video:
-                sent = await wa_bot.send_video(
+                sent = await clients.wa_bot.send_video(
                     **media_kwargs,
                     video=download,
                     mime_type=msg.story.video.mime_type or "video/mp4",
                 )
             elif msg.story.photo:
-                sent = await wa_bot.send_image(
+                sent = await clients.wa_bot.send_image(
                     **media_kwargs, photo=download, mime_type="image/jpeg"
                 )
             else:
@@ -184,21 +183,21 @@ async def _handle_media_message(
                 return
 
         case enums.MessageMediaType.ANIMATION:
-            sent = await wa_bot.send_video(
+            sent = await clients.wa_bot.send_video(
                 **media_kwargs,
                 video=download,
                 mime_type=msg.animation.mime_type or "video/mp4",
             )
 
         case enums.MessageMediaType.VIDEO_NOTE:
-            sent = await wa_bot.send_video(
+            sent = await clients.wa_bot.send_video(
                 **media_kwargs,
                 video=download,
                 mime_type=msg.video_note.mime_type or "video/mp4",
             )
 
         case enums.MessageMediaType.DOCUMENT:
-            sent = await wa_bot.send_document(
+            sent = await clients.wa_bot.send_document(
                 **media_kwargs,
                 document=download,
                 filename=msg.document.file_name,
@@ -209,13 +208,13 @@ async def _handle_media_message(
 
         # with no caption
         case enums.MessageMediaType.AUDIO:
-            sent = await wa_bot.send_audio(
+            sent = await clients.wa_bot.send_audio(
                 **msg_kwargs,
                 audio=download,
                 mime_type=msg.audio.mime_type or "audio/mpeg",
             )
         case enums.MessageMediaType.VOICE:
-            sent = await wa_bot.send_audio(
+            sent = await clients.wa_bot.send_audio(
                 **msg_kwargs,
                 audio=download,
                 mime_type=msg.voice.mime_type or "audio/ogg",
@@ -225,7 +224,7 @@ async def _handle_media_message(
                 await msg.reply("__Animated stickers are not supported__", quote=True)
                 return
 
-            sent = await wa_bot.send_sticker(
+            sent = await clients.wa_bot.send_sticker(
                 **msg_kwargs,
                 sticker=download,
                 mime_type=msg.sticker.mime_type or "image/webp",
@@ -244,7 +243,7 @@ async def _handle_other_message(
 ) -> str | None:
     sent = None
     if msg.text:
-        sent = await wa_bot.send_message(
+        sent = await clients.wa_bot.send_message(
             **msg_kwargs,
             text=text,
             preview_url=not msg.link_preview_options.is_disabled
@@ -253,7 +252,7 @@ async def _handle_other_message(
             reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
         )
     elif msg.location or msg.venue:
-        sent = await wa_bot.send_location(
+        sent = await clients.wa_bot.send_location(
             **msg_kwargs,
             latitude=msg.location.latitude
             if msg.location
@@ -265,7 +264,7 @@ async def _handle_other_message(
             address=msg.venue.address if msg.venue else None,
         )
     elif msg.contact:
-        sent = await wa_bot.send_contact(
+        sent = await clients.wa_bot.send_contact(
             **msg_kwargs,
             reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
             contact=wa_types.Contact(
@@ -292,7 +291,7 @@ async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
             msg = repositoy.get_message(
                 topic_msg_id=reaction.message_id, wa_msg_id=None
             )
-            await wa_bot.remove_reaction(
+            await clients.wa_bot.remove_reaction(
                 to=msg.user.wa_id,
                 message_id=msg.wa_msg_id,
                 tracker=modules.Tracker(
@@ -309,7 +308,7 @@ async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
             msg = repositoy.get_message(
                 topic_msg_id=reaction.message_id, wa_msg_id=None
             )
-            await wa_bot.send_reaction(
+            await clients.wa_bot.send_reaction(
                 to=msg.user.wa_id,
                 message_id=msg.wa_msg_id,
                 emoji=reaction.new_reaction[-1].emoji,
@@ -389,7 +388,7 @@ async def on_command(client: Client, msg: tg_types.Message):
             await msg.reply("No topic found", quote=True)
             return
 
-        await wa_bot.request_location(to=topic.user.wa_id, text="Location requested")
+        await clients.wa_bot.request_location(to=topic.user.wa_id, text="Location requested")
 
     elif cmd in ["/settings", "/ban", "/unban"]:
         # check if the user is admin in the group
@@ -501,7 +500,7 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
 
             # update the chat_opened in the bot on WhatsApp
             if chat_opened_enable:
-                await wa_bot.update_conversational_automation(
+                await clients.wa_bot.update_conversational_automation(
                     enable_chat_opened=chat_opened_enable,
                 )
 
