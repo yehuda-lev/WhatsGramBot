@@ -13,20 +13,7 @@ from tg import handlers as tg_handlers
 
 
 # log config
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-file_handler = RotatingFileHandler(
-    filename="bot.log", maxBytes=5 * (2**20), backupCount=1, mode="D", encoding="utf-8"
-)
-file_handler.setLevel(logging.DEBUG)
-logging.basicConfig(
-    format="%(asctime)s | %(levelname)s | %(module)s | %(message)s",
-    handlers=(console_handler, file_handler),
-)
-logging.getLogger().setLevel(logging.NOTSET)
-logging.getLogger("pyrogram").setLevel(logging.WARNING)
-logging.getLogger("pywa").setLevel(logging.INFO)
-
+config.setup_logging()
 _logger = logging.getLogger(__name__)
 
 settings = config.get_settings()
