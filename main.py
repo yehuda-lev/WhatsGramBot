@@ -54,7 +54,6 @@ async def main():
         webhook_challenge_delay=10,
         session=httpx_session,
         handlers_modules=[wa_bot_handlers_module],
-        filter_updates=False,
     )
 
 

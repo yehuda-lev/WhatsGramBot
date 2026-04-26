@@ -17,7 +17,7 @@ send_to = settings.tg_group_topic_id
 
 
 async def _create_user(
-    _: WhatsApp, msg: wa_types.Message | wa_types.ChatOpened
+    _: WhatsApp, msg: wa_types.Message
 ) -> bool:
     wa_id = msg.sender
     name = msg.from_user.name
@@ -31,11 +31,9 @@ async def _create_user(
     except NoResultFound:  # if user not exists than create user
         try:  # get if wa_chat_opened_enable and if wa_welcome_msg
             db_settings = repositoy.get_settings()
-            chat_opened_enable = db_settings.wa_chat_opened_enable
             welcome_msg = db_settings.wa_welcome_msg
         except NoResultFound:
             repositoy.create_settings()
-            chat_opened_enable = False
             welcome_msg = False
 
         # get text welcome message
@@ -47,9 +45,6 @@ async def _create_user(
                 )
             except NoResultFound:
                 pass
-
-        if isinstance(msg, wa_types.ChatOpened) and not chat_opened_enable:
-            return False
 
         if welcome_msg and text_welcome:
             if not (
@@ -68,11 +63,6 @@ async def _create_user(
 
 
 create_user = filters.new(_create_user)
-
-
-@WhatsApp.on_chat_opened(filters=create_user)
-async def get_chat_opened(_: WhatsApp, __: wa_types.ChatOpened):
-    pass
 
 
 @WhatsApp.on_phone_number_change
@@ -184,7 +174,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
 
         try:
             if msg.has_media:
-                download = io.BytesIO(await msg.download_media(in_memory=True))
+                download = io.BytesIO(await msg.get_media_bytes())
                 download.name = f"{msg.type}{msg.media.extension or ''}"
                 media_kwargs = dict(
                     **kwargs,
