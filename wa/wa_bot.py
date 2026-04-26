@@ -91,7 +91,7 @@ async def on_phone_number_change(
     repositoy.update_topic(tg_topic_id=topic.topic_id, name=new_name)
     await clients.tg_bot.edit_forum_topic(
         chat_id=settings.tg_group_topic_id,
-        topic_id=topic.topic_id,
+        message_thread_id=topic.topic_id,
         name=new_name,
     )
     # TODO edit the first message & button in the topic (pinned message)

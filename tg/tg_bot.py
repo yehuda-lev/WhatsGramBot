@@ -175,7 +175,7 @@ async def _handle_media_message(
                 )
             elif msg.story.photo:
                 sent = await clients.wa_bot.send_image(
-                    **media_kwargs, photo=download, mime_type="image/jpeg"
+                    **media_kwargs, image=download, mime_type="image/jpeg"
                 )
             else:
                 await msg.reply("__Unsupported story type__", quote=True)
