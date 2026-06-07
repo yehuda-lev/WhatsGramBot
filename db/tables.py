@@ -109,7 +109,6 @@ class Settings(BaseTable):
     __tablename__ = "settings"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    wa_chat_opened_enable: Mapped[bool] = mapped_column(default=False)
     wa_welcome_msg: Mapped[bool] = mapped_column(default=False)
     wa_mark_as_read: Mapped[bool] = mapped_column(default=False)
 

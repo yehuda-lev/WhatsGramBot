@@ -408,20 +408,15 @@ async def on_command(client: Client, msg: tg_types.Message):
         if cmd == "/settings":
             try:
                 db_settings = repositoy.get_settings()
-                chat_opened_enable = db_settings.wa_chat_opened_enable
                 welcome_msg = db_settings.wa_welcome_msg
                 mark_as_read = db_settings.wa_mark_as_read
             except sqlalchemy_errors.NoResultFound:
                 repositoy.create_settings()
-                chat_opened_enable = False
                 welcome_msg = False
                 mark_as_read = False
 
             await msg.reply(
                 text=f"**Settings**\n"
-                f"**Chat opened enable:** __{chat_opened_enable}__\n"
-                f"> if chat opened is active - the bot will create topic when user open chat. "
-                f"else - the bot will create topic only if user send message\n\n"
                 f"**Welcome message:** __{welcome_msg}__\n"
                 f"> if welcome message is active - the bot will send welcome message when the topic is created\n\n"
                 f"**Mark as read:** __{mark_as_read}__\n"
@@ -431,13 +426,6 @@ async def on_command(client: Client, msg: tg_types.Message):
                 quote=True,
                 reply_markup=tg_types.InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            tg_types.InlineKeyboardButton(
-                                text=f"Chat opened: {'disable ❌' if chat_opened_enable else 'enable ✅'}",
-                                callback_data=f"settings_chat_opened_enable_"
-                                f"{'disable' if chat_opened_enable else 'enable'}",
-                            ),
-                        ],
                         [
                             tg_types.InlineKeyboardButton(
                                 text=f"Welcome message {'disable ❌' if welcome_msg else 'enable ✅'}",
@@ -503,21 +491,7 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
     cbd_data = cbd.data
 
     if cbd_data.startswith("settings"):
-        if cbd_data.startswith("settings_chat_opened_enable"):
-            chat_opened_enable = cbd_data.split("_")[-1] == "enable"
-            repositoy.update_settings(wa_chat_opened_enable=chat_opened_enable)
-
-            # update the chat_opened in the bot on WhatsApp
-            if chat_opened_enable:
-                await clients.wa_bot.update_conversational_automation(
-                    enable_chat_opened=chat_opened_enable,
-                )
-
-            await cbd.message.edit_text(
-                f"Chat opened is {'enabled' if chat_opened_enable else 'disabled'} now"
-            )
-
-        elif cbd_data.startswith("settings_welcome_msg"):
+        if cbd_data.startswith("settings_welcome_msg"):
             welcome_msg = cbd_data.split("_")[-1] == "enable"
             repositoy.update_settings(wa_welcome_msg=welcome_msg)
             await cbd.message.edit_text(

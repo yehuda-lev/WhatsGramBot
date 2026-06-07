@@ -274,26 +274,21 @@ def update_message_to_send(*, type_event: str, **kwargs):
 
 def create_settings(
     *,
-    chat_opened_enable: bool = False,
     welcome_msg: bool = False,
     mark_as_read: bool = False,
 ):
     """
     Create settings
-    :param chat_opened_enable: the status of the chat
     :param welcome_msg: the status of the welcome message
     :param mark_as_read: the status of the mark as read
     :return:
     """
 
-    _logger.debug(
-        f"create settings, wa_chat_opened_enable:{chat_opened_enable}, wa_welcome_msg:{welcome_msg}, wa_mark_as_read:{mark_as_read}"
-    )
+    _logger.debug(f"create settings, {welcome_msg=}, {mark_as_read=}")
     cache.delete(cache_name="get_settings")
 
     with get_session() as session:
         settings = Settings(
-            wa_chat_opened_enable=chat_opened_enable,
             wa_welcome_msg=welcome_msg,
             wa_mark_as_read=mark_as_read,
         )
