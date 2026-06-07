@@ -46,8 +46,12 @@ class WaUser(BaseTable):
     __tablename__ = "wa_user"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    wa_id: Mapped[str] = mapped_column(String(15), unique=True)
+    wa_id: Mapped[str | None] = mapped_column(String(15), unique=True, nullable=True)
+    bsuid: Mapped[str | None] = mapped_column(
+        String(15), unique=True, nullable=True
+    )  # can be null for old users that were created before the bsuid was added, but should be unique and not null for new users
     name: Mapped[str] = mapped_column(String(30))
+    username: Mapped[str | None] = mapped_column(String(32), nullable=True)
     active: Mapped[bool] = mapped_column(default=True)
     banned: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime.datetime]

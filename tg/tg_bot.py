@@ -46,7 +46,10 @@ async def on_message(_: Client, msg: tg_types.Message):
         except sqlalchemy_errors.NoResultFound:
             pass
 
-    wa_id = topic.user.wa_id
+    wa_id = (
+        topic.user.wa_id or topic.user.bsuid
+    )  # bsuid is not supported yet when sending messages
+    wa_user_id = topic.user.bsuid or topic.user.wa_id
     sent = None
 
     kwargs = dict(to=wa_id, tracker=modules.Tracker(chat_id=msg.chat.id, msg_id=msg.id))
@@ -119,7 +122,7 @@ async def on_message(_: Client, msg: tg_types.Message):
             db_settings = repositoy.get_settings()
             mark_as_read = db_settings.wa_mark_as_read
             if mark_as_read:
-                message_to_read = repositoy.get_last_message(wa_id=wa_id)
+                message_to_read = repositoy.get_last_message(wa_id=wa_user_id)
                 if (
                     not message_to_read.sent_from_tg
                 ):  # the last message to read is from whatsapp
@@ -134,7 +137,7 @@ async def on_message(_: Client, msg: tg_types.Message):
             topic_id=topic_id,
             topic_msg_id=msg.id,
             wa_msg_id=sent,
-            wa_id=wa_id,
+            wa_id=wa_user_id,
             sent_from_tg=True,
         )
     else:
@@ -361,7 +364,7 @@ async def on_command(client: Client, msg: tg_types.Message):
 
         await msg.reply(
             text=f"**Name:** __{topic.user.name}__\n"
-            f"**WhatsApp ID:** `{topic.user.wa_id}`\n"
+            f"**WhatsApp ID:** `{topic.user.wa_id or topic.user.bsuid}`\n"
             f"**Topic ID:** `{topic.topic_id}`\n"
             f"**Banned:** __{topic.user.banned}__\n"
             f"**Active:** __{topic.user.active}__\n"
@@ -371,7 +374,7 @@ async def on_command(client: Client, msg: tg_types.Message):
                 inline_keyboard=[
                     [
                         tg_types.InlineKeyboardButton(
-                            text="WhatsApp", url=f"https://wa.me/{topic.user.wa_id}"
+                            text="WhatsApp", url=f"https://wa.me/{topic.user.wa_id or topic.user.username}"
                         ),
                         tg_types.InlineKeyboardButton(
                             text="Topic",
@@ -388,7 +391,9 @@ async def on_command(client: Client, msg: tg_types.Message):
             await msg.reply("No topic found", quote=True)
             return
 
-        await clients.wa_bot.request_location(to=topic.user.wa_id, text="Location requested")
+        await clients.wa_bot.request_location(
+            to=topic.user.bsuid or topic.user.wa_id, text="Location requested"
+        )
 
     elif cmd in ["/settings", "/ban", "/unban"]:
         # check if the user is admin in the group
@@ -470,7 +475,9 @@ async def on_command(client: Client, msg: tg_types.Message):
                 chat_id=msg.chat.id, message_thread_id=topic_id
             )
 
-            repositoy.update_user(wa_id=topic.user.wa_id, banned=True)
+            repositoy.update_user(
+                wa_user_id=topic.user.bsuid or topic.user.wa_id, banned=True
+            )
             await msg.reply("User banned", quote=True)
 
         elif cmd == "/unban":
@@ -486,7 +493,9 @@ async def on_command(client: Client, msg: tg_types.Message):
                 chat_id=msg.chat.id, message_thread_id=topic_id
             )
 
-            repositoy.update_user(wa_id=topic.user.wa_id, banned=False)
+            repositoy.update_user(
+                wa_user_id=topic.user.bsuid or topic.user.wa_id, banned=False
+            )
             await msg.reply("User unbanned", quote=True)
 
 

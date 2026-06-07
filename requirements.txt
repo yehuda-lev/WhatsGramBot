@@ -1,6 +1,6 @@
 pyrotgfork==2.2.23
 TgCrypto==1.2.5
-pywa==4.0.0b6
+pywa==4.0.0b7
 uvicorn==0.32.0
 fastapi==0.115.3
 SQLAlchemy==2.0.36

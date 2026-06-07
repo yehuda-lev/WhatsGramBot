@@ -1,6 +1,8 @@
 import logging
 import datetime
 
+from sqlalchemy import or_
+
 from data import modules, cache_memory
 from db.tables import get_session, WaUser, Topic, Message, MessageToSend, Settings
 
@@ -9,18 +11,26 @@ _logger = logging.getLogger(__name__)
 cache = cache_memory.my_cache
 
 
-def create_user_and_topic(wa_id: str, name: str, topic_id: int):
+def create_user_and_topic(
+    wa_id: str | None, bsuid: str, name: str, username: str | None, topic_id: int
+):
     """
     Create user and topic
-    :param wa_id: the number of the user
+    :param wa_id: the number of the user, can be null if the user is enabled the username
+    :param bsuid: the id of the user in the business system (should be unique and not null)
     :param name: the name of the user and the topic
+    :param username: the username of the user
     :param topic_id: the id of the topic
     :return:
     """
 
-    _logger.debug(f"create user wa_id:{wa_id}, name:{name}, topic_id:{topic_id}")
+    _logger.debug(f"create user {wa_id=}, {bsuid=}, {name=}, {username=}, {topic_id=}")
+    if wa_id is not None:
+        cache.delete(
+            cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=wa_id)
+        )
     cache.delete(
-        cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=wa_id)
+        cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=bsuid)
     )
     cache.delete(
         cache_name="get_topic_by_topic_id",
@@ -35,7 +45,9 @@ def create_user_and_topic(wa_id: str, name: str, topic_id: int):
         )
         user = WaUser(
             wa_id=wa_id,
+            bsuid=bsuid,
             name=name,
+            username=username,
             topic=topic,
             created_at=datetime.datetime.now(),
         )
@@ -53,27 +65,11 @@ def get_user_by_wa_id(*, wa_id: str) -> WaUser:
     """
 
     with get_session() as session:
-        return session.query(WaUser).filter(WaUser.wa_id == wa_id).one()
-
-
-def update_wa_id(*, old_wa_id: str, new_wa_id: str):
-    """
-    Update wa_id of user
-
-    :param old_wa_id: the current number of the user
-    :param new_wa_id: the new number of the user
-    :return:
-    """
-    _logger.debug(f"update wa_id from {old_wa_id} to {new_wa_id}")
-    cache.delete(
-        cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=old_wa_id)
-    )
-
-    with get_session() as session:
-        session.query(WaUser).filter(WaUser.wa_id == old_wa_id).update(
-            {"wa_id": new_wa_id}
+        return (
+            session.query(WaUser)
+            .filter(or_(WaUser.wa_id == wa_id, WaUser.bsuid == wa_id))
+            .one()
         )
-        session.commit()
 
 
 @cache.cachable(cache_name="get_topic_by_topic_id", params=("topic_id",))
@@ -87,26 +83,28 @@ def get_topic_by_topic_id(*, topic_id: int) -> Topic:
         return session.query(Topic).filter(Topic.topic_id == topic_id).one()
 
 
-def update_user(*, wa_id: str, **kwargs):
+def update_user(*, wa_user_id: str, **kwargs):
     """
     Update user
-    :param wa_id: the number of the user
+    :param wa_user_id: the number of the user or the bsuid of the user to update (wa_id is preferred, if the user has wa_id)
     :param kwargs: the fields to update
     :return:
     """
 
-    _logger.debug(f"update user wa_id:{wa_id}, kwargs:{kwargs}")
-    user = get_user_by_wa_id(wa_id=wa_id)
+    _logger.debug(f"update user {wa_user_id=}, {kwargs=}")
+    user = get_user_by_wa_id(wa_id=wa_user_id)
     cache.delete(
         cache_name="get_topic_by_topic_id",
         cache_id=cache.build_cache_id(topic_id=user.topic.topic_id),
     )
     cache.delete(
-        cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=wa_id)
+        cache_name="get_user_by_wa_id", cache_id=cache.build_cache_id(wa_id=wa_user_id)
     )
 
     with get_session() as session:
-        session.query(WaUser).filter(WaUser.wa_id == wa_id).update(kwargs)
+        session.query(WaUser).filter(
+            or_(WaUser.wa_id == wa_user_id, WaUser.bsuid == wa_user_id)
+        ).update(kwargs)
         session.commit()
 
 
@@ -154,7 +152,11 @@ def create_message(
         f"create message wa_id:{wa_id}, topic_id:{topic_id}, wa_msg_id:{wa_msg_id}, topic_msg_id:{topic_msg_id}, sent_from_tg:{sent_from_tg}"
     )
     with get_session() as session:
-        user = session.query(WaUser).filter(WaUser.wa_id == wa_id).one()
+        user = (
+            session.query(WaUser)
+            .filter(or_(WaUser.wa_id == wa_id, WaUser.bsuid == wa_id))
+            .one()
+        )
         topic = session.query(Topic).filter(Topic.topic_id == topic_id).one()
         message = Message(
             wa_msg_id=wa_msg_id,

@@ -16,84 +16,111 @@ settings = config.get_settings()
 send_to = settings.tg_group_topic_id
 
 
-async def _create_user(
-    _: WhatsApp, msg: wa_types.Message
-) -> bool:
-    wa_id = msg.sender
-    name = msg.from_user.name
+async def _create_user(_: WhatsApp, msg: wa_types.Message) -> bool:
+    bsuid = (wa_user := msg.from_user).bsuid
+    wa_id = wa_user.wa_id
+    name = wa_user.name
 
-    try:  # try to get user and update status
-        user = repositoy.get_user_by_wa_id(wa_id=wa_id)
-        if not user.active:
-            repositoy.update_user(wa_id=wa_id, active=True)
-        if user.banned:
-            return False
-    except NoResultFound:  # if user not exists than create user
-        try:  # get if wa_chat_opened_enable and if wa_welcome_msg
-            db_settings = repositoy.get_settings()
-            welcome_msg = db_settings.wa_welcome_msg
+    for _ in range(
+        2
+    ):  # try twice to handle bsuid update if the user was created before the bsuid was added to the database
+        try:
+            user = repositoy.get_user_by_wa_id(wa_id=bsuid)
+            if not user.active:
+                repositoy.update_user(wa_user_id=bsuid, active=True)
+            if user.banned:
+                return False
+
+            if (user.wa_id is None) and (
+                wa_id is not None
+            ):  # the user share his wa_id but the bsuid is the same, update the wa_id
+                try:
+                    repositoy.get_user_by_wa_id(wa_id=wa_id)
+                except NoResultFound:
+                    repositoy.update_user(wa_user_id=bsuid, wa_id=wa_id)
+
         except NoResultFound:
-            repositoy.create_settings()
-            welcome_msg = False
-
-        # get text welcome message
-        text_welcome = None
-        if welcome_msg:
             try:
-                text_welcome = repositoy.get_message_to_send(
-                    type_event=modules.EventType.MSG_WELCOME
+                repositoy.get_user_by_wa_id(wa_id=wa_id)
+                repositoy.update_user(wa_user_id=wa_id, bsuid=bsuid)  # update the bsuid
+                continue  # check if active or banned
+
+            except NoResultFound:  # if user not exists than create user
+                try:  # get if wa_chat_opened_enable and if wa_welcome_msg
+                    db_settings = repositoy.get_settings()
+                    welcome_msg = db_settings.wa_welcome_msg
+                except NoResultFound:
+                    repositoy.create_settings()
+                    welcome_msg = False
+
+                # get text welcome message
+                text_welcome = None
+                if welcome_msg:
+                    try:
+                        text_welcome = repositoy.get_message_to_send(
+                            type_event=modules.EventType.MSG_WELCOME
+                        )
+                    except NoResultFound:
+                        pass
+
+                if welcome_msg and text_welcome:
+                    if not (
+                        isinstance(msg, wa_types.Message)
+                        and not msg.text.startswith("/start")
+                    ):
+                        await msg.reply(text_welcome.text)
+
+                # create user and topic
+                topic_id = await utils.create_topic(
+                    clients.tg_bot, wa_id or bsuid, name, is_new=True
                 )
-            except NoResultFound:
-                pass
+                repositoy.create_user_and_topic(
+                    wa_id=wa_id,
+                    bsuid=bsuid,
+                    name=name,
+                    username=wa_user.username,
+                    topic_id=topic_id,
+                )
+        break
 
-        if welcome_msg and text_welcome:
-            if not (
-                isinstance(msg, wa_types.Message) and not msg.text.startswith("/start")
-            ):
-                await msg.reply(text_welcome.text)
-
-        # create user and topic
-        topic_id = await utils.create_topic(clients.tg_bot, wa_id, name, is_new=True)
-        repositoy.create_user_and_topic(
-            wa_id=wa_id,
-            name=name,
-            topic_id=topic_id,
-        )
     return True
 
 
 create_user = filters.new(_create_user)
 
 
-@WhatsApp.on_phone_number_change
-async def on_phone_number_change(
-    wa: WhatsApp,
-    event: wa_types.PhoneNumberChange,
-):
-    topic = repositoy.get_user_by_wa_id(wa_id=event.sender).topic
-    new_name = utils.get_topic_name(
-        wa_id=event.new_wa_id, name=utils.get_user_name_from_topic_name(topic.name)
-    )
-    repositoy.update_wa_id(
-        old_wa_id=event.old_wa_id,
-        new_wa_id=event.new_wa_id,
-    )
-    repositoy.update_topic(tg_topic_id=topic.topic_id, name=new_name)
-    await clients.tg_bot.edit_forum_topic(
-        chat_id=settings.tg_group_topic_id,
-        message_thread_id=topic.topic_id,
-        name=new_name,
-    )
-    # TODO edit the first message & button in the topic (pinned message)
-    await clients.tg_bot.send_message(
-        chat_id=settings.tg_group_topic_id,
-        text=f"__User {event.old_wa_id} changed phone number to {event.new_wa_id}__",
-        reply_parameters=tg_types.ReplyParameters(message_id=topic.topic_id),
-    )
-    await wa.send_message(
-        to=event.new_wa_id,
-        text=f"_Your phone number has been changed to {event.new_wa_id}_",
-    )
+# @WhatsApp.on_phone_number_change
+# @WhatsApp.on_identity_change
+# async def on_phone_number_change(
+#     wa: WhatsApp,
+#     event: wa_types.PhoneNumberChange | wa_types.IdentityChange
+# ):
+#     old_wa_id = event.old_wa_id
+#     old_bsuid = event.from_user.
+#     topic = repositoy.get_user_by_wa_id(wa_id=event.sender).topic
+#     new_name = utils.get_topic_name(
+#         wa_id=event.new_wa_id, name=utils.get_user_name_from_topic_name(topic.name)
+#     )
+#     repositoy.update_user(
+#         wa_user_id=event.old_wa_id,
+#         new_wa_id=event.new_wa_id,
+#     )
+#     repositoy.update_topic(tg_topic_id=topic.topic_id, name=new_name)
+#     await clients.tg_bot.edit_forum_topic(
+#         chat_id=settings.tg_group_topic_id,
+#         message_thread_id=topic.topic_id,
+#         name=new_name,
+#     )
+#     # TODO edit the first message & button in the topic (pinned message)
+#     await clients.tg_bot.send_message(
+#         chat_id=settings.tg_group_topic_id,
+#         text=f"__User {event.old_wa_id} changed phone number to {event.new_wa_id}__",
+#         reply_parameters=tg_types.ReplyParameters(message_id=topic.topic_id),
+#     )
+#     await wa.send_message(
+#         to=event.new_wa_id,
+#         text=f"_Your phone number has been changed to {event.new_wa_id}_",
+#     )
 
 
 @WhatsApp.on_message_status(filters=filters.failed, factory=modules.Tracker)
@@ -107,7 +134,7 @@ async def on_failed_status(
         reply_parameters=tg_types.ReplyParameters(message_id=status.tracker.msg_id),
     )
     if isinstance(status.error, wa_errors.ReEngagementMessage):  # 24 hours passed
-        repositoy.update_user(wa_id=status.sender, active=False)
+        repositoy.update_user(wa_user_id=status.sender, active=False)
     else:
         _logger.error(status.error)
 
@@ -135,7 +162,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
     except NoResultFound:
         pass
 
-    wa_id = msg.sender
+    wa_user_id = msg.sender
 
     text = (
         utils.get_wa_text_to_tg(msg.text or msg.caption)
@@ -150,7 +177,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             text = f"{text}\n\n{text_forwarded}"
 
     while True:
-        user = repositoy.get_user_by_wa_id(wa_id=wa_id)
+        user = repositoy.get_user_by_wa_id(wa_id=wa_user_id)
         topic_id = user.topic.topic_id
         sent = None
         reply_msg = None
@@ -298,7 +325,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
             _logger.debug("his topic was deleted, creating new topic..")
             try:
                 new_topic_id = await utils.create_topic(
-                    clients.tg_bot, wa_id, user.name, is_new=False
+                    clients.tg_bot, wa_user_id, user.name, is_new=False
                 )
                 repositoy.update_topic(tg_topic_id=topic_id, topic_id=new_topic_id)
             except Exception:  # noqa
@@ -322,7 +349,7 @@ async def get_message(_: WhatsApp, msg: wa_types.Message):
 
         if sent:
             repositoy.create_message(
-                wa_id=wa_id,
+                wa_id=wa_user_id,
                 topic_id=topic_id,
                 wa_msg_id=msg.id,
                 topic_msg_id=sent.id,
