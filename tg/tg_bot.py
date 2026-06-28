@@ -12,7 +12,6 @@ from db import repositoy
 
 _logger = logging.getLogger(__name__)
 
-wa_bot = clients.wa_bot
 settings = config.get_settings()
 
 media_kb_limit = {
@@ -47,7 +46,10 @@ async def on_message(_: Client, msg: tg_types.Message):
         except sqlalchemy_errors.NoResultFound:
             pass
 
-    wa_id = topic.user.wa_id
+    wa_id = (
+        topic.user.wa_id or topic.user.bsuid
+    )  # bsuid is not supported yet when sending messages
+    wa_user_id = topic.user.bsuid or topic.user.wa_id
     sent = None
 
     kwargs = dict(to=wa_id, tracker=modules.Tracker(chat_id=msg.chat.id, msg_id=msg.id))
@@ -120,11 +122,11 @@ async def on_message(_: Client, msg: tg_types.Message):
             db_settings = repositoy.get_settings()
             mark_as_read = db_settings.wa_mark_as_read
             if mark_as_read:
-                message_to_read = repositoy.get_last_message(wa_id=wa_id)
+                message_to_read = repositoy.get_last_message(wa_id=wa_user_id)
                 if (
                     not message_to_read.sent_from_tg
                 ):  # the last message to read is from whatsapp
-                    await wa_bot.mark_message_as_read(
+                    await clients.wa_bot.mark_message_as_read(
                         message_id=message_to_read.wa_msg_id
                     )
         except (sqlalchemy_errors.NoResultFound, wa_errors.WhatsAppError):
@@ -135,7 +137,7 @@ async def on_message(_: Client, msg: tg_types.Message):
             topic_id=topic_id,
             topic_msg_id=msg.id,
             wa_msg_id=sent,
-            wa_id=wa_id,
+            wa_id=wa_user_id,
             sent_from_tg=True,
         )
     else:
@@ -156,12 +158,12 @@ async def _handle_media_message(
     )
     match msg.media:
         case enums.MessageMediaType.PHOTO:
-            sent = await wa_bot.send_image(
+            sent = await clients.wa_bot.send_image(
                 **media_kwargs, image=download, mime_type="image/jpeg"
             )
 
         case enums.MessageMediaType.VIDEO:
-            sent = await wa_bot.send_video(
+            sent = await clients.wa_bot.send_video(
                 **media_kwargs,
                 video=download,
                 mime_type=msg.video.mime_type or "video/mp4",
@@ -169,14 +171,14 @@ async def _handle_media_message(
 
         case enums.MessageMediaType.STORY:
             if msg.story.video:
-                sent = await wa_bot.send_video(
+                sent = await clients.wa_bot.send_video(
                     **media_kwargs,
                     video=download,
                     mime_type=msg.story.video.mime_type or "video/mp4",
                 )
             elif msg.story.photo:
-                sent = await wa_bot.send_image(
-                    **media_kwargs, photo=download, mime_type="image/jpeg"
+                sent = await clients.wa_bot.send_image(
+                    **media_kwargs, image=download, mime_type="image/jpeg"
                 )
             else:
                 await msg.reply("__Unsupported story type__", quote=True)
@@ -184,21 +186,21 @@ async def _handle_media_message(
                 return
 
         case enums.MessageMediaType.ANIMATION:
-            sent = await wa_bot.send_video(
+            sent = await clients.wa_bot.send_video(
                 **media_kwargs,
                 video=download,
                 mime_type=msg.animation.mime_type or "video/mp4",
             )
 
         case enums.MessageMediaType.VIDEO_NOTE:
-            sent = await wa_bot.send_video(
+            sent = await clients.wa_bot.send_video(
                 **media_kwargs,
                 video=download,
                 mime_type=msg.video_note.mime_type or "video/mp4",
             )
 
         case enums.MessageMediaType.DOCUMENT:
-            sent = await wa_bot.send_document(
+            sent = await clients.wa_bot.send_document(
                 **media_kwargs,
                 document=download,
                 filename=msg.document.file_name,
@@ -209,13 +211,13 @@ async def _handle_media_message(
 
         # with no caption
         case enums.MessageMediaType.AUDIO:
-            sent = await wa_bot.send_audio(
+            sent = await clients.wa_bot.send_audio(
                 **msg_kwargs,
                 audio=download,
                 mime_type=msg.audio.mime_type or "audio/mpeg",
             )
         case enums.MessageMediaType.VOICE:
-            sent = await wa_bot.send_audio(
+            sent = await clients.wa_bot.send_audio(
                 **msg_kwargs,
                 audio=download,
                 mime_type=msg.voice.mime_type or "audio/ogg",
@@ -225,7 +227,7 @@ async def _handle_media_message(
                 await msg.reply("__Animated stickers are not supported__", quote=True)
                 return
 
-            sent = await wa_bot.send_sticker(
+            sent = await clients.wa_bot.send_sticker(
                 **msg_kwargs,
                 sticker=download,
                 mime_type=msg.sticker.mime_type or "image/webp",
@@ -244,7 +246,7 @@ async def _handle_other_message(
 ) -> str | None:
     sent = None
     if msg.text:
-        sent = await wa_bot.send_message(
+        sent = await clients.wa_bot.send_message(
             **msg_kwargs,
             text=text,
             preview_url=not msg.link_preview_options.is_disabled
@@ -253,7 +255,7 @@ async def _handle_other_message(
             reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
         )
     elif msg.location or msg.venue:
-        sent = await wa_bot.send_location(
+        sent = await clients.wa_bot.send_location(
             **msg_kwargs,
             latitude=msg.location.latitude
             if msg.location
@@ -265,7 +267,7 @@ async def _handle_other_message(
             address=msg.venue.address if msg.venue else None,
         )
     elif msg.contact:
-        sent = await wa_bot.send_contact(
+        sent = await clients.wa_bot.send_contact(
             **msg_kwargs,
             reply_to_message_id=reply_msg.wa_msg_id if reply_msg else None,
             contact=wa_types.Contact(
@@ -292,7 +294,7 @@ async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
             msg = repositoy.get_message(
                 topic_msg_id=reaction.message_id, wa_msg_id=None
             )
-            await wa_bot.remove_reaction(
+            await clients.wa_bot.remove_reaction(
                 to=msg.user.wa_id,
                 message_id=msg.wa_msg_id,
                 tracker=modules.Tracker(
@@ -309,7 +311,7 @@ async def on_reaction(_: Client, reaction: tg_types.MessageReactionUpdated):
             msg = repositoy.get_message(
                 topic_msg_id=reaction.message_id, wa_msg_id=None
             )
-            await wa_bot.send_reaction(
+            await clients.wa_bot.send_reaction(
                 to=msg.user.wa_id,
                 message_id=msg.wa_msg_id,
                 emoji=reaction.new_reaction[-1].emoji,
@@ -362,7 +364,7 @@ async def on_command(client: Client, msg: tg_types.Message):
 
         await msg.reply(
             text=f"**Name:** __{topic.user.name}__\n"
-            f"**WhatsApp ID:** `{topic.user.wa_id}`\n"
+            f"**WhatsApp ID:** `{topic.user.wa_id or topic.user.bsuid}`\n"
             f"**Topic ID:** `{topic.topic_id}`\n"
             f"**Banned:** __{topic.user.banned}__\n"
             f"**Active:** __{topic.user.active}__\n"
@@ -372,7 +374,7 @@ async def on_command(client: Client, msg: tg_types.Message):
                 inline_keyboard=[
                     [
                         tg_types.InlineKeyboardButton(
-                            text="WhatsApp", url=f"https://wa.me/{topic.user.wa_id}"
+                            text="WhatsApp", url=f"https://wa.me/{topic.user.wa_id or topic.user.username}"
                         ),
                         tg_types.InlineKeyboardButton(
                             text="Topic",
@@ -389,7 +391,9 @@ async def on_command(client: Client, msg: tg_types.Message):
             await msg.reply("No topic found", quote=True)
             return
 
-        await wa_bot.request_location(to=topic.user.wa_id, text="Location requested")
+        await clients.wa_bot.request_location(
+            to=topic.user.bsuid or topic.user.wa_id, text="Location requested"
+        )
 
     elif cmd in ["/settings", "/ban", "/unban"]:
         # check if the user is admin in the group
@@ -404,20 +408,15 @@ async def on_command(client: Client, msg: tg_types.Message):
         if cmd == "/settings":
             try:
                 db_settings = repositoy.get_settings()
-                chat_opened_enable = db_settings.wa_chat_opened_enable
                 welcome_msg = db_settings.wa_welcome_msg
                 mark_as_read = db_settings.wa_mark_as_read
             except sqlalchemy_errors.NoResultFound:
                 repositoy.create_settings()
-                chat_opened_enable = False
                 welcome_msg = False
                 mark_as_read = False
 
             await msg.reply(
                 text=f"**Settings**\n"
-                f"**Chat opened enable:** __{chat_opened_enable}__\n"
-                f"> if chat opened is active - the bot will create topic when user open chat. "
-                f"else - the bot will create topic only if user send message\n\n"
                 f"**Welcome message:** __{welcome_msg}__\n"
                 f"> if welcome message is active - the bot will send welcome message when the topic is created\n\n"
                 f"**Mark as read:** __{mark_as_read}__\n"
@@ -427,13 +426,6 @@ async def on_command(client: Client, msg: tg_types.Message):
                 quote=True,
                 reply_markup=tg_types.InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            tg_types.InlineKeyboardButton(
-                                text=f"Chat opened: {'disable ❌' if chat_opened_enable else 'enable ✅'}",
-                                callback_data=f"settings_chat_opened_enable_"
-                                f"{'disable' if chat_opened_enable else 'enable'}",
-                            ),
-                        ],
                         [
                             tg_types.InlineKeyboardButton(
                                 text=f"Welcome message {'disable ❌' if welcome_msg else 'enable ✅'}",
@@ -471,7 +463,9 @@ async def on_command(client: Client, msg: tg_types.Message):
                 chat_id=msg.chat.id, message_thread_id=topic_id
             )
 
-            repositoy.update_user(wa_id=topic.user.wa_id, banned=True)
+            repositoy.update_user(
+                wa_user_id=topic.user.bsuid or topic.user.wa_id, banned=True
+            )
             await msg.reply("User banned", quote=True)
 
         elif cmd == "/unban":
@@ -487,7 +481,9 @@ async def on_command(client: Client, msg: tg_types.Message):
                 chat_id=msg.chat.id, message_thread_id=topic_id
             )
 
-            repositoy.update_user(wa_id=topic.user.wa_id, banned=False)
+            repositoy.update_user(
+                wa_user_id=topic.user.bsuid or topic.user.wa_id, banned=False
+            )
             await msg.reply("User unbanned", quote=True)
 
 
@@ -495,21 +491,7 @@ async def on_callback_query(_: Client, cbd: tg_types.CallbackQuery):
     cbd_data = cbd.data
 
     if cbd_data.startswith("settings"):
-        if cbd_data.startswith("settings_chat_opened_enable"):
-            chat_opened_enable = cbd_data.split("_")[-1] == "enable"
-            repositoy.update_settings(wa_chat_opened_enable=chat_opened_enable)
-
-            # update the chat_opened in the bot on WhatsApp
-            if chat_opened_enable:
-                await wa_bot.update_conversational_automation(
-                    enable_chat_opened=chat_opened_enable,
-                )
-
-            await cbd.message.edit_text(
-                f"Chat opened is {'enabled' if chat_opened_enable else 'disabled'} now"
-            )
-
-        elif cbd_data.startswith("settings_welcome_msg"):
+        if cbd_data.startswith("settings_welcome_msg"):
             welcome_msg = cbd_data.split("_")[-1] == "enable"
             repositoy.update_settings(wa_welcome_msg=welcome_msg)
             await cbd.message.edit_text(
